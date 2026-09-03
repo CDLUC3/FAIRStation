@@ -1,174 +1,147 @@
-# FAIR Station schema: version 1
+# FAIR Station research record: version 1
 
 Status: working hypothesis for [ngRAMS issue #177](https://github.com/CDLUC3/ngRAMS/issues/177)
 
-## What we mean by schema
+## Purpose
 
-The FAIR Station schema is primarily its **common domain model**: the concepts
-FAIR Station needs and the relationships between them, independent of any one
-source platform.
+This document defines the initial **common domain model** for FAIR Station. It
+is not a database schema or JSON Schema. The model must work independently of
+RAMS and will change as we test real station workflows.
 
-This is distinct from two implementation details that can come later:
+## Model overview
 
-- the database schema used to persist the model; and
-- a JSON Schema used to validate data exchanged with FAIR Station.
+```mermaid
+erDiagram
+    RESEARCH_ACTIVITY {
+        string title
+        string description "optional"
+        datetime source_record_created_at
+        datetime first_visit_started_at "optional, derived"
+    }
+    STATION {
+        string name
+    }
+    ACTIVITY_STATION_ASSOCIATION {
+        string source_id "optional"
+    }
+    PERSON {
+        string name
+    }
+    ORGANIZATION {
+        string name
+    }
+    PARTICIPATION {
+        string role
+    }
+    VISIT {
+        datetime starts_at
+        datetime ends_at
+    }
+    VISIT_PARTICIPATION {
+        datetime arrives_at "optional"
+        datetime departs_at "optional"
+    }
+    FUNDING {
+        string title
+        string sponsor
+        string identifier "optional"
+        string state
+        decimal amount "optional"
+    }
 
-Those implementations should follow the common model, but they do not need to
-be designed before we can test the model. Version 1 is a small, revisable
-hypothesis rather than a complete standard.
-
-## The version 1 model
-
-The central concept is a `ResearchActivity`: a coherent research endeavor
-hosted or supported by a station.
-
-```text
-ResearchActivity
-├── title
-├── description (optional)
-├── source record created at
-├── station associations[] → Station
-├── activity participations[] → Person
-│                                ├── role
-│                                └── affiliation → Organization (optional)
-├── visits[] → Visit → hosted at → Station
-│                      ├── starts at / ends at
-│                      └── visit participations[] → activity participation
-└── funding[] → Funding
+    RESEARCH_ACTIVITY ||--o{ ACTIVITY_STATION_ASSOCIATION : has
+    STATION ||--o{ ACTIVITY_STATION_ASSOCIATION : identifies
+    RESEARCH_ACTIVITY ||--o{ PARTICIPATION : has
+    PERSON ||--o{ PARTICIPATION : joins_through
+    ORGANIZATION o|--o{ PARTICIPATION : affiliation_for
+    RESEARCH_ACTIVITY ||--o{ VISIT : has
+    STATION ||--o{ VISIT : hosts
+    VISIT ||--o{ VISIT_PARTICIPATION : has
+    PARTICIPATION ||--o{ VISIT_PARTICIPATION : attends_through
+    RESEARCH_ACTIVITY ||--o{ FUNDING : has
 ```
 
-The initial domain concepts are:
+`ResearchActivity` is a coherent research endeavor hosted or supported by one
+or more stations. Source adapters produce this model but are not part of the
+schema shown above.
 
-- **ResearchActivity** — the research being conducted.
-- **Station** — the field station, reserve, or comparable host.
-- **Person** — someone participating in the research.
-- **Participation** — the relationship connecting a person to an activity,
-  including their role and affiliation at that time.
-- **Organization** — an institution associated with a participation.
-- **ActivityStationAssociation** — an explicit relationship between a
-  research activity and a station, independent of any particular visit.
-- **Visit** — a bounded period during which some or all of an activity's
-  participants are expected at one station.
-- **VisitParticipation** — the relationship identifying which activity
-  participants are associated with a particular visit. It may include that
-  person's arrival and departure when the source supplies them.
-- **Funding** — a source-described funding application, award, contract, or
-  other financial support associated with an activity.
-
-The relationships are part of the model. FAIR Station should not receive
-disconnected people, stations, and activities and then guess how they relate.
-
-An activity has zero or more source-asserted station associations independently
-of its visits. Each association identifies one station; it is not evidence that
-a visit occurred there. An activity can also have zero or more visits, and its
-participants do not need to attend any visit. This supports people who
-contribute through laboratory, analysis, administrative, or other off-station
-work. A visit has exactly one host station in version 1; an activity can
-therefore reach multiple stations through multiple visits, including stations
-outside its direct station associations. A person must be an activity
-participant before a `VisitParticipation` can connect them to one of its
-visits.
-
-The common relationship is provisionally named `ActivityStationAssociation`,
-rather than `home`, `primary`, or `hosted at`. It is plural because the common
-model must support research spanning multiple stations. RAMS currently exposes
-at most one direct `Project#reserve` association, while the project's visits
-can reference multiple reserves. The source model alone does not establish a
-stronger meaning for the direct relationship. The first mapping must preserve
-it separately from visit-to-reserve assertions and test its meaning with users
-and a non-RAMS workflow.
-
-### Dates and lifecycle milestones
-
-Project-level dates must not be used as a substitute for visit dates. Version
-1 retains two distinct milestones:
-
-- `source_record_created_at` is when the source says its activity record was
-  created. It is source lifecycle/provenance data, not the date the research
-  began. It can support prompting people to develop a new record.
-- `first_visit_started_at` is a derived activity milestone: the earliest start
-  among visits that satisfy the import's documented occurred-visit rule. Its
-  value must retain the visit and source facts from which it was derived. It
-  can identify activities that progressed into station-use workflows such as
-  permits and waivers.
-
-Whether a scheduled visit counts as having "occurred" is not yet settled.
-RAMS has visit dates and statuses, but a start date alone may not prove
-attendance. The first slice must state its qualifying-status rule and must not
-silently treat cancelled, denied, incomplete, or future visits as occurred.
-Until that rule is validated, `first_visit_started_at` may be unknown even when
-scheduled visits exist.
-
-Research-level proposed start and end dates may still be useful, but their
-meaning across sources is not established in version 1. They are not used to
-infer visit timing.
-
-### Funding in version 1
-
-Funding is included because a real RAMS mapping can test and demonstrate a
-useful research-reporting result. One activity can have zero or more funding
-records. The initial shape carries only source-supported facts needed for that
-mapping: title, sponsor as supplied, award or opportunity identifier when
-present, funding period, amount when present, and source-described state.
-
-The source remains authoritative for correcting these facts. FAIR Station does
-not infer that a sponsor label is a reconciled `Organization`, that a submitted
-application is an award, or that a missing amount means zero. RAMS represents
-planned, submitted, funded, and denied states with multiple fields; the RAMS
-mapper must define their precedence and report contradictory combinations
-rather than concealing them. Sponsor reconciliation, currency normalization,
-and a cross-source controlled funding-status vocabulary remain deferred.
-
-## How source data becomes FAIR Station data
-
-Each source has an adapter that translates its own concepts into the common
-model:
-
-```text
-RAMS Project ─────── RAMS adapter ───────┐
-                                         │
-Another source ───── its adapter ────────┼──> FAIR Station model
-                                         │
-Structured form ──── its adapter ────────┘
-```
-
-For the reference implementation, the initial mapping is:
-
-| RAMS concept | FAIR Station concept |
+| Concept | Meaning |
 | --- | --- |
-| Project | ResearchActivity |
+| `ResearchActivity` | The research being conducted |
+| `Station` | A field station, reserve, or comparable host |
+| `ActivityStationAssociation` | An explicit activity-to-station relationship, independent of visits |
+| `Person` | Someone participating in the research |
+| `Participation` | A person's activity role and affiliation at that time |
+| `Organization` | An institution associated with a participation |
+| `Visit` | A bounded period for the activity at one station |
+| `VisitParticipation` | Which activity participants joined a visit, with individual dates when supplied |
+| `Funding` | A source-described application, award, contract, or other financial support |
+
+### Relationship rules
+
+- An activity may be associated with many stations and have many visits.
+- Each visit has one host station in version 1.
+- Activity participation does not imply visit attendance. Some participants
+  may do lab, analysis, administrative, or other off-station work.
+- Visit participants must also be activity participants.
+- Direct activity-to-station associations and visit locations remain distinct.
+- Relationships must be supplied by the source or mapper, not reconstructed by
+  FAIR Station.
+
+## Dates
+
+Version 1 keeps two activity milestones:
+
+- `source_record_created_at`: when the source record was created. This is not
+  the start of the research.
+- `first_visit_started_at`: the earliest qualifying visit start, derived from
+  source-linked visit evidence.
+
+Project-level dates do not replace visit dates. The first slice must define
+which RAMS visit statuses count as having occurred; cancelled, denied,
+incomplete, or future visits must not count silently.
+
+## Funding
+
+An activity may have many funding records. Version 1 maps the source-supported
+title, sponsor, award or opportunity identifier, dates, amount, and state.
+
+RAMS stores planned, submitted, funded, and denied states in several fields.
+The RAMS mapper must define precedence and report contradictory combinations.
+Missing amounts are not zero, sponsor labels are not reconciled organizations,
+and submitted applications are not assumed to be awards.
+
+## Initial RAMS mapping
+
+Only RAMS projects with source type `Research` are included in the first slice.
+Other RAMS project types may support future reporting, but they are not assumed
+to be `ResearchActivity` records.
+
+| RAMS | FAIR Station |
+| --- | --- |
+| Project | `ResearchActivity` |
 | Project `created_at` | `source_record_created_at` |
-| Project reserve | One item in the activity's station associations |
-| Visit | Visit |
-| Visit reserve | Visit's host Station |
-| User | Person |
-| Project team membership | Participation |
-| User visit | VisitParticipation |
-| Institution | Organization |
-| Funding | Funding |
+| Project reserve | One `ActivityStationAssociation` |
+| Project team membership | `Participation` |
+| User | `Person` |
+| Institution | `Organization` |
+| Visit | `Visit` |
+| Visit reserve | Visit's host `Station` |
+| User visit | `VisitParticipation` |
+| Funding | `Funding` |
 
-RAMS has research, class, meeting, public-use, and housing projects. The first
-slice imports only RAMS projects whose source type is `Research`. That is an
-adapter selection rule, not a claim that classes, retreats, meetings, or other
-station uses are research activities. Those records remain important possible
-inputs for operational and cross-station reporting, but admitting them requires
-a separately validated common concept or an explicit expansion of
-`ResearchActivity`.
+RAMS currently gives a project at most one direct reserve, while its visits can
+span multiple reserves. FAIR Station supports many activity-level station
+associations so the common model is not limited by that RAMS representation.
 
-RAMS's `first_reserve_visit_on_project?` behavior answers whether another visit
-exists for the same project and reserve. It is not a project-wide first-visit
-date and does not prove that attendance occurred. FAIR Station therefore
-derives its milestone from imported visit facts under the documented occurred-
-visit rule instead of mapping that RAMS predicate directly.
-
-This mapping tests the common model; it does not make RAMS's structure the
-common model. A source without projects, user accounts, or Active Record models
-can map its own concepts into the same FAIR Station concepts.
+RAMS's `first_reserve_visit_on_project?` checks whether another visit exists
+for the same project and reserve. It is neither a project-wide first-visit date
+nor proof of attendance, so it does not map directly to
+`first_visit_started_at`.
 
 ## Source identity and provenance
 
-Every imported `ResearchActivity` must retain a reference to the record that
-produced it:
+Every imported activity retains an opaque source reference:
 
 ```json
 {
@@ -177,85 +150,48 @@ produced it:
 }
 ```
 
-`source` identifies the originating system, not its technology. `source_id` is
-an opaque, stable identifier chosen by that source. For example, another source
-might use a submission UUID or an API URL.
+The pair `(source, source_id)` identifies an import for idempotency. A FAIR
+Station internal identifier is separate. Visits and funding retain source
+identifiers when available; visit participation retains enough source linkage
+to diagnose its origin. Derived values cite the facts used to produce them.
 
-Together, `source` and `source_id` identify one imported activity:
+ORCID and ROR are public identifiers, not source references, and do not prove
+that two records describe the same entity. Missing source data is not a
+negative assertion.
 
-```text
-(rams, projects/123)             != (another-system, projects/123)
-(rams, projects/123)             != (rams, projects/456)
-```
-
-FAIR Station can enforce uniqueness on that pair to prevent the same source
-record from being imported twice. It may also assign its own internal ID to the
-resulting `ResearchActivity`; that ID serves a different purpose.
-
-Related people, stations, and organizations may carry their own source
-references when the source gives them stable identities. They are not required
-to have one in version 1. A form submission, for example, may identify the
-activity but provide only a person's name and affiliation.
-
-ORCID and ROR are public identifiers, not source references. They may help FAIR
-Station recognize people and organizations, but reconciliation is not part of
-the first workflow.
-
-Visits and funding records also retain their source identifiers when available.
-`VisitParticipation` retains the identity or source linkage needed to diagnose
-which source attendance record produced it. Derived milestones cite those
-source-linked records rather than presenting the derivation as a source
-assertion. An omitted relationship means the source did not supply it; it must
-not be interpreted as a confirmed statement that the relationship does not
-exist.
-
-## Adapter configuration hypothesis
-
-Survey123, Qualtrics, and Google Forms may eventually support reusable
-platform-level connectors, while each station supplies mapping configuration
-for its particular questions and answer choices. The connector would own
-platform behavior such as authentication, pagination, and response formats;
-the station-specific mapping would state how that form represents visits,
-people, stations, and funding.
-
-This is a future possibility, not a version 1 ingestion framework. The RAMS
-adapter remains explicit, and shared connector or configuration protocols
-should be extracted only after a second working source reveals what is truly
-common. Configuration must not turn unlabeled answers into generic metadata or
-hide the meaning and provenance of a station's assertions.
-
-## What version 1 will test
+## Version 1 validation slice
 
 The first end-to-end slice will:
 
-1. select one RAMS project of source type `Research` and read its creation
-   timestamp, direct station association, team, visits, visit participants,
-   visit reserves, and funding;
-2. map it into the common model;
-3. store or display the resulting connected research activity; and
-4. show the source-record creation milestone, the explicitly derived first-
-   visit milestone when supported, and mapped funding; and
-5. retain enough source identity and derivation evidence to repeat, update, or
-   diagnose the import.
+1. read one RAMS research project with its creation time, reserve, team,
+   visits, visit participants, visit reserves, and funding;
+2. map those records into the connected model above;
+3. store or display the result and its two lifecycle milestones; and
+4. preserve enough identity and evidence to repeat, update, and diagnose the
+   import.
 
-We will then describe at least three non-RAMS workflows using the same model.
-If they do not fit naturally, we will revise the model before treating it as a
-stable contract.
+We will also test the model against specific non-RAMS examples before treating
+it as stable.
 
-## Deferred
+## Deferred and open
 
-Version 1 does not yet define:
+Version 1 does not define:
 
-- a complete JSON Schema or public API;
-- the FAIR Station database tables;
-- multiple-source reconciliation and merging;
-- detailed visit operations such as reservations, amenities, permits, waivers,
-  invoicing, or visit approval workflows;
-- funding sponsor reconciliation, currency normalization, or a controlled
-  cross-source status vocabulary;
-- non-research station activities such as classes, meetings, retreats, public
-  use, or housing;
-- controlled vocabularies for activity types, roles, or statuses; or
-- enrichment through ORCID, ROR, or other services.
+- database tables, a public API, or a complete JSON Schema;
+- cross-source reconciliation or merging;
+- visit operations such as reservations, approvals, amenities, permits,
+  waivers, or invoicing;
+- normalized funding sponsors, currencies, or statuses;
+- controlled activity, participation-role, or status vocabularies;
+- non-research activities such as classes, meetings, retreats, public use, or
+  housing; or
+- ORCID, ROR, or other enrichment.
 
-These should be added when a tested workflow requires them.
+The first slice must still validate:
+
+- what RAMS's direct project reserve means in domain language; and
+- which evidence establishes that a visit occurred.
+
+Future Survey123, Qualtrics, or Google Forms integrations may share a
+platform-level connector while using station-specific mappings. That remains a
+hypothesis until a second source reveals what can safely be shared.
