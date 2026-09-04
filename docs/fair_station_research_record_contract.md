@@ -21,9 +21,6 @@ erDiagram
     STATION {
         string name
     }
-    ACTIVITY_STATION_ASSOCIATION {
-        string source_id "optional"
-    }
     PERSON {
         string name
     }
@@ -49,27 +46,23 @@ erDiagram
         decimal amount "optional"
     }
 
-    RESEARCH_ACTIVITY ||--o{ ACTIVITY_STATION_ASSOCIATION : has
-    STATION ||--o{ ACTIVITY_STATION_ASSOCIATION : identifies
     RESEARCH_ACTIVITY ||--o{ PARTICIPATION : has
-    PERSON ||--o{ PARTICIPATION : joins_through
-    ORGANIZATION o|--o{ PARTICIPATION : affiliation_for
+    PARTICIPATION o{--|| PERSON : identifies
+    PARTICIPATION o{--o| ORGANIZATION : affiliated_with
     RESEARCH_ACTIVITY ||--o{ VISIT : has
-    STATION ||--o{ VISIT : hosts
-    VISIT ||--o{ VISIT_PARTICIPATION : has
-    PARTICIPATION ||--o{ VISIT_PARTICIPATION : attends_through
+    VISIT o{--|| STATION : occurs_at
+    VISIT ||--o{ VISIT_PARTICIPATION : includes
+    VISIT_PARTICIPATION o{--|| PARTICIPATION : records
     RESEARCH_ACTIVITY ||--o{ FUNDING : has
 ```
 
-`ResearchActivity` is a coherent research endeavor hosted or supported by one
-or more stations. Source adapters produce this model but are not part of the
-schema shown above.
+`ResearchActivity` is a coherent research endeavor. Source adapters produce
+this model but are not part of the schema shown above.
 
 | Concept | Meaning |
 | --- | --- |
 | `ResearchActivity` | The research being conducted |
 | `Station` | A field station, reserve, or comparable host |
-| `ActivityStationAssociation` | An explicit activity-to-station relationship, independent of visits |
 | `Person` | Someone participating in the research |
 | `Participation` | A person's activity role and affiliation at that time |
 | `Organization` | An institution associated with a participation |
@@ -79,12 +72,11 @@ schema shown above.
 
 ### Relationship rules
 
-- An activity may be associated with many stations and have many visits.
+- An activity may have many visits across many stations.
 - Each visit has one host station in version 1.
 - Activity participation does not imply visit attendance. Some participants
   may do lab, analysis, administrative, or other off-station work.
 - Visit participants must also be activity participants.
-- Direct activity-to-station associations and visit locations remain distinct.
 - Relationships must be supplied by the source or mapper, not reconstructed by
   FAIR Station.
 
@@ -121,7 +113,6 @@ to be `ResearchActivity` records.
 | --- | --- |
 | Project | `ResearchActivity` |
 | Project `created_at` | `source_record_created_at` |
-| Project reserve | One `ActivityStationAssociation` |
 | Project team membership | `Participation` |
 | User | `Person` |
 | Institution | `Organization` |
@@ -130,9 +121,9 @@ to be `ResearchActivity` records.
 | User visit | `VisitParticipation` |
 | Funding | `Funding` |
 
-RAMS currently gives a project at most one direct reserve, while its visits can
-span multiple reserves. FAIR Station supports many activity-level station
-associations so the common model is not limited by that RAMS representation.
+RAMS projects can span multiple reserves through their visits. The optional
+`Project#reserve` field is not mapped in version 1 because its domain meaning
+has not been established.
 
 RAMS's `first_reserve_visit_on_project?` checks whether another visit exists
 for the same project and reserve. It is neither a project-wide first-visit date
@@ -161,14 +152,19 @@ negative assertion.
 
 ## Version 1 validation slice
 
-The first end-to-end slice will:
+The version 1 model remains broader than its first executable increment. The
+first end-to-end increment will:
 
-1. read one RAMS research project with its creation time, reserve, team,
-   visits, visit participants, visit reserves, and funding;
+1. read one RAMS research project with its creation time, team, visits, visit
+   participants, and visit reserves;
 2. map those records into the connected model above;
 3. store or display the result and its two lifecycle milestones; and
 4. preserve enough identity and evidence to repeat, update, and diagnose the
    import.
+
+Funding remains in the version 1 working model but is not part of this first
+executable increment. Its RAMS payload and precedence rules require a separate
+validation increment.
 
 We will also test the model against specific non-RAMS examples before treating
 it as stable.
@@ -187,10 +183,8 @@ Version 1 does not define:
   housing; or
 - ORCID, ROR, or other enrichment.
 
-The first slice must still validate:
-
-- what RAMS's direct project reserve means in domain language; and
-- which evidence establishes that a visit occurred.
+The first slice must still validate which evidence establishes that a visit
+occurred.
 
 Future Survey123, Qualtrics, or Google Forms integrations may share a
 platform-level connector while using station-specific mappings. That remains a
