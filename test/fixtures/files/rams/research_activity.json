@@ -1,0 +1,46 @@
+{
+  "id": 123,
+  "type": "Research",
+  "title": "Coastal fog and redwood water use",
+  "description": "Measure seasonal fog contributions to mature redwoods.",
+  "created_at": "2025-01-15T14:30:00Z",
+  "team_members": [
+    {
+      "id": 501,
+      "role": "Principal Investigator",
+      "person": { "id": 41, "name": "Dr. Alex Rivera" },
+      "organization": { "id": 8, "name": "Example State University" }
+    },
+    {
+      "id": 502,
+      "role": "Research Assistant",
+      "person": { "id": 42, "name": "Morgan Lee" },
+      "organization": null
+    }
+  ],
+  "visits": [
+    {
+      "id": 801,
+      "status": "completed",
+      "starts_at": "2025-06-03T16:00:00Z",
+      "ends_at": "2025-06-06T18:00:00Z",
+      "station": { "id": 12, "name": "Redwood Field Station" },
+      "participants": [
+        {
+          "id": 901,
+          "team_membership_id": 501,
+          "arrives_at": "2025-06-03T16:00:00Z",
+          "departs_at": "2025-06-06T18:00:00Z"
+        }
+      ]
+    },
+    {
+      "id": 802,
+      "status": "cancelled",
+      "starts_at": "2025-03-01T16:00:00Z",
+      "ends_at": "2025-03-02T18:00:00Z",
+      "station": { "id": 13, "name": "Coastal Reserve" },
+      "participants": []
+    }
+  ]
+}

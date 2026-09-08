@@ -1,0 +1,12 @@
+/.bundle
+/.DS_Store
+/.env*
+/.ruby-lsp
+/config/master.key
+/log/*
+/storage/*
+/tmp/*
+
+!/log/.keep
+!/storage/.keep
+!/tmp/.keep

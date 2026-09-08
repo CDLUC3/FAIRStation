@@ -1,0 +1,17 @@
+# Read about fixtures at https://api.rubyonrails.org/classes/ActiveRecord/FixtureSet.html
+
+one:
+  research_activity: one
+  person: one
+  organization: one
+  source: MyString
+  source_id: MyString
+  role: MyString
+
+two:
+  research_activity: two
+  person: two
+  organization: two
+  source: MyString
+  source_id: MyString
+  role: MyString

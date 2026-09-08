@@ -28,7 +28,8 @@ to command FAIR Station over HTTP.
 Responsibilities are separated as follows:
 
 - `HttpClient` owns reusable GET, JSON parsing, timeout, and HTTP failure
-  mechanics without knowing which source it serves.
+  mechanics without knowing which source it serves. It uses Faraday for
+  outbound HTTP so adapters do not select or configure transport libraries.
 - `RamsAdapter` owns the RAMS endpoint, authentication header, payload fields,
   source IDs, and the provisional rule that only completed, non-future visits
   establish `first_visit_started_at`. It returns an unsaved graph composed of
