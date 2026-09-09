@@ -59,3 +59,7 @@ bin/rails routes                      # View routes
 - **Every branch in a conditional must have at least one test.**
 - **Return `status: :unprocessable_entity`** on failed form renders (required by Turbo).
 - **Prefer RESTful routes.** Custom verb actions usually mean a missing noun/resource.
+
+## Read When Relevant
+
+- **`docs/rails_guidelines.md`** — Read before writing or modifying Rails code, tests, migrations, controllers, or models. Covers testing conventions (TDD, no `let`/`before`), security rules, database patterns, views/presenters, and the "comments as a last resort" policy.
