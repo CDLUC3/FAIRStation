@@ -1,6 +1,6 @@
 # FAIR Station research record: version 1
 
-Status: working hypothesis for [ngRAMS issue #177](https://github.com/CDLUC3/ngRAMS/issues/177)
+Status: working hypothesis for #32 
 
 ## Purpose
 
