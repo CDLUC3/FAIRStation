@@ -1,0 +1,330 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: FAIR Station staging ECR, HTTPS ALB and private ECS Fargate runtime.
+Parameters:
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+  PublicSubnetIds:
+    Type: List<AWS::EC2::Subnet::Id>
+  TaskSubnetIds:
+    Type: List<AWS::EC2::Subnet::Id>
+    Description: Private subnets with NAT or all required AWS endpoints and outbound access.
+  TaskSecurityGroupId:
+    Type: AWS::EC2::SecurityGroup::Id
+  DatabaseSecretArn:
+    Type: String
+  CertificateArn:
+    Type: String
+    Default: ''
+    Description: Existing regional ACM certificate covering Hostname; empty creates a DNS-validated certificate.
+  Hostname:
+    Type: String
+    AllowedPattern: '[a-zA-Z0-9][a-zA-Z0-9.-]+'
+  ImageUri:
+    Type: String
+    Default: ''
+    Description: Empty only for initial desired-zero bootstrap; otherwise the deployed ECR digest URI.
+  HostedZoneId:
+    Type: String
+    Default: ''
+    Description: Existing public Route 53 zone; required for a new certificate, optional for existing certificates.
+  DesiredCount:
+    Type: Number
+    Default: 0
+    MinValue: 0
+    MaxValue: 4
+  SecretKeyKmsKeyArn:
+    Type: String
+    Default: ''
+    Description: Optional customer-managed KMS key for the SSM secret (empty uses alias/aws/ssm).
+Rules:
+  CertificateRequiresDns:
+    Assertions:
+      - Assert: !Or
+          - !Not [!Equals [!Ref CertificateArn, '']]
+          - !Not [!Equals [!Ref HostedZoneId, '']]
+        AssertDescription: Supply either an existing certificate ARN or a public hosted zone for DNS validation.
+Conditions:
+  HasImage: !Not [!Equals [!Ref ImageUri, '']]
+  HasSecretKeyKmsKey: !Not [!Equals [!Ref SecretKeyKmsKeyArn, '']]
+  CreateCertificate: !Equals [!Ref CertificateArn, '']
+  ManageDns: !Not [!Equals [!Ref HostedZoneId, '']]
+Resources:
+  Certificate:
+    Type: AWS::CertificateManager::Certificate
+    Condition: CreateCertificate
+    Properties:
+      DomainName: !Ref Hostname
+      ValidationMethod: DNS
+      DomainValidationOptions:
+        - DomainName: !Ref Hostname
+          HostedZoneId: !Ref HostedZoneId
+  DnsRecord:
+    Type: AWS::Route53::RecordSet
+    Condition: ManageDns
+    Properties:
+      HostedZoneId: !Ref HostedZoneId
+      Name: !Ref Hostname
+      Type: A
+      AliasTarget:
+        DNSName: !GetAtt LoadBalancer.DNSName
+        HostedZoneId: !GetAtt LoadBalancer.CanonicalHostedZoneID
+        EvaluateTargetHealth: true
+  Repository:
+    Type: AWS::ECR::Repository
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      RepositoryName: fairstation-stg
+      ImageTagMutability: IMMUTABLE
+      ImageScanningConfiguration:
+        ScanOnPush: true
+      EncryptionConfiguration:
+        EncryptionType: AES256
+  AppLogs:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      LogGroupName: /ecs/fairstation-stg
+      RetentionInDays: 30
+  Cluster:
+    Type: AWS::ECS::Cluster
+    Properties:
+      ClusterName: fairstation-stg
+      ClusterSettings:
+        - Name: containerInsights
+          Value: enabled
+  LoadBalancerSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: FAIR Station public HTTPS and HTTP redirect
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+      SecurityGroupEgress:
+        - IpProtocol: tcp
+          FromPort: 3000
+          ToPort: 3000
+          DestinationSecurityGroupId: !Ref TaskSecurityGroupId
+  TaskIngress:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId: !Ref TaskSecurityGroupId
+      IpProtocol: tcp
+      FromPort: 3000
+      ToPort: 3000
+      SourceSecurityGroupId: !Ref LoadBalancerSecurityGroup
+  LoadBalancer:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Scheme: internet-facing
+      Type: application
+      Subnets: !Ref PublicSubnetIds
+      SecurityGroups: [!Ref LoadBalancerSecurityGroup]
+      LoadBalancerAttributes:
+        - Key: routing.http.drop_invalid_header_fields.enabled
+          Value: 'true'
+  TargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      VpcId: !Ref VpcId
+      Protocol: HTTP
+      Port: 3000
+      TargetType: ip
+      HealthCheckPath: /up
+      Matcher:
+        HttpCode: '200'
+      TargetGroupAttributes:
+        - Key: deregistration_delay.timeout_seconds
+          Value: '30'
+  HttpsListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      LoadBalancerArn: !Ref LoadBalancer
+      Port: 443
+      Protocol: HTTPS
+      SslPolicy: ELBSecurityPolicy-TLS13-1-2-2021-06
+      Certificates:
+        - CertificateArn: !If [CreateCertificate, !Ref Certificate, !Ref CertificateArn]
+      DefaultActions:
+        - Type: fixed-response
+          FixedResponseConfig:
+            StatusCode: '404'
+            ContentType: text/plain
+            MessageBody: Unknown host
+  HostRule:
+    Type: AWS::ElasticLoadBalancingV2::ListenerRule
+    Properties:
+      ListenerArn: !Ref HttpsListener
+      Priority: 1
+      Conditions:
+        - Field: host-header
+          Values: [!Ref Hostname]
+      Actions:
+        - Type: forward
+          TargetGroupArn: !Ref TargetGroup
+  HttpListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      LoadBalancerArn: !Ref LoadBalancer
+      Port: 80
+      Protocol: HTTP
+      DefaultActions:
+        - Type: redirect
+          RedirectConfig:
+            Protocol: HTTPS
+            Port: '443'
+            StatusCode: HTTP_301
+  ExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal: {Service: ecs-tasks.amazonaws.com}
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: RuntimeBootstrap
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: ecr:GetAuthorizationToken
+                Resource: '*'
+              - Effect: Allow
+                Action: [ecr:BatchGetImage, ecr:GetDownloadUrlForLayer, ecr:BatchCheckLayerAvailability]
+                Resource: !GetAtt Repository.Arn
+              - Effect: Allow
+                Action: [logs:CreateLogStream, logs:PutLogEvents]
+                Resource: !GetAtt AppLogs.Arn
+              - Effect: Allow
+                Action: ssm:GetParameters
+                Resource:
+                  - !Sub arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/uc3/fairstation/stg/RdsHost
+                  - !Sub arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/uc3/fairstation/stg/RdsPort
+                  - !Sub arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/uc3/fairstation/stg/RdsName
+                  - !Sub arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/uc3/fairstation/stg/secret_key_base
+              - Effect: Allow
+                Action: secretsmanager:GetSecretValue
+                Resource: !Ref DatabaseSecretArn
+              - !If
+                - HasSecretKeyKmsKey
+                - Effect: Allow
+                  Action: kms:Decrypt
+                  Resource: !Ref SecretKeyKmsKeyArn
+                  Condition:
+                    StringEquals:
+                      kms:ViaService: !Sub ssm.${AWS::Region}.amazonaws.com
+                - !Ref AWS::NoValue
+  TaskRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal: {Service: ecs-tasks.amazonaws.com}
+            Action: sts:AssumeRole
+  TaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: fairstation-stg-web
+      Cpu: '512'
+      Memory: '1024'
+      RequiresCompatibilities: [FARGATE]
+      NetworkMode: awsvpc
+      RuntimePlatform:
+        CpuArchitecture: X86_64
+        OperatingSystemFamily: LINUX
+      ExecutionRoleArn: !GetAtt ExecutionRole.Arn
+      TaskRoleArn: !GetAtt TaskRole.Arn
+      ContainerDefinitions:
+        - Name: rails
+          Essential: true
+          Image: !If [HasImage, !Ref ImageUri, !Sub '${Repository.RepositoryUri}:bootstrap']
+          PortMappings:
+            - ContainerPort: 3000
+          Environment:
+            - {Name: RAILS_ENV, Value: production}
+            - {Name: PORT, Value: '3000'}
+            - {Name: RAILS_LOG_TO_STDOUT, Value: 'true'}
+            - {Name: RAILS_SERVE_STATIC_FILES, Value: 'true'}
+            - Name: RAILS_ALLOWED_HOSTS
+              Value: !Ref Hostname
+          Secrets:
+            - Name: DATABASE_HOST
+              ValueFrom: !Sub arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/uc3/fairstation/stg/RdsHost
+            - Name: DATABASE_PORT
+              ValueFrom: !Sub arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/uc3/fairstation/stg/RdsPort
+            - Name: DATABASE_NAME
+              ValueFrom: !Sub arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/uc3/fairstation/stg/RdsName
+            - Name: DATABASE_USERNAME
+              ValueFrom: !Sub '${DatabaseSecretArn}:username::'
+            - Name: DATABASE_PASSWORD
+              ValueFrom: !Sub '${DatabaseSecretArn}:password::'
+            - Name: SECRET_KEY_BASE
+              ValueFrom: !Sub arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/uc3/fairstation/stg/secret_key_base
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Ref AppLogs
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: rails
+  Service:
+    Type: AWS::ECS::Service
+    DependsOn: [HostRule, TaskIngress]
+    Properties:
+      ServiceName: fairstation-stg-web
+      Cluster: !Ref Cluster
+      LaunchType: FARGATE
+      PlatformVersion: '1.4.0'
+      DesiredCount: !Ref DesiredCount
+      TaskDefinition: !Ref TaskDefinition
+      EnableECSManagedTags: true
+      DeploymentConfiguration:
+        MinimumHealthyPercent: 100
+        MaximumPercent: 200
+        DeploymentCircuitBreaker:
+          Enable: true
+          Rollback: true
+      HealthCheckGracePeriodSeconds: 120
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          AssignPublicIp: DISABLED
+          Subnets: !Ref TaskSubnetIds
+          SecurityGroups: [!Ref TaskSecurityGroupId]
+      LoadBalancers:
+        - TargetGroupArn: !Ref TargetGroup
+          ContainerName: rails
+          ContainerPort: 3000
+Outputs:
+  RepositoryName:
+    Value: !Ref Repository
+  RepositoryUri:
+    Value: !GetAtt Repository.RepositoryUri
+  ClusterName:
+    Value: !Ref Cluster
+  ServiceName:
+    Value: !GetAtt Service.Name
+  TaskDefinitionArn:
+    Value: !Ref TaskDefinition
+  ExecutionRoleArn:
+    Value: !GetAtt ExecutionRole.Arn
+  TaskRoleArn:
+    Value: !GetAtt TaskRole.Arn
+  LoadBalancerDnsName:
+    Value: !GetAtt LoadBalancer.DNSName
+  LoadBalancerHostedZoneId:
+    Value: !GetAtt LoadBalancer.CanonicalHostedZoneID
+  TargetGroupArn:
+    Value: !Ref TargetGroup
+  ApplicationUrl:
+    Value: !Sub https://${Hostname}

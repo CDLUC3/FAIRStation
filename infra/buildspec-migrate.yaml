@@ -1,0 +1,8 @@
+version: 0.2
+phases:
+  build:
+    commands:
+      - python3 infra/pipeline.py migrate
+artifacts:
+  files:
+    - deployment.json

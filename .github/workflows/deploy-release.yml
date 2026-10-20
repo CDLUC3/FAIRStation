@@ -1,0 +1,97 @@
+name: Deploy release
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing published release tag to retry (for example v0.1.0); run from main
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    if: github.event_name == 'workflow_dispatch' || !github.event.release.prerelease
+    runs-on: ubuntu-latest
+    environment: staging
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Validate published release and resolve immutable commit
+        id: release
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
+        env:
+          REQUESTED_TAG: ${{ inputs.tag }}
+        with:
+          script: |
+            if (context.eventName === 'workflow_dispatch' && context.ref !== 'refs/heads/main') {
+              throw new Error('Manual deployment retries must run the workflow from main.');
+            }
+            const tag = context.eventName === 'workflow_dispatch'
+              ? process.env.REQUESTED_TAG
+              : context.payload.release.tag_name;
+            if (!/^v\d+\.\d+\.\d+$/.test(tag || '')) {
+              throw new Error('Use an existing stable release tag in vMAJOR.MINOR.PATCH format.');
+            }
+            const { data: release } = await github.rest.repos.getReleaseByTag({ ...context.repo, tag });
+            if (release.draft || release.prerelease || !release.published_at) {
+              throw new Error('Only published, non-prerelease GitHub releases may deploy.');
+            }
+            if (context.eventName === 'release' && release.id !== context.payload.release.id) {
+              throw new Error('The published event no longer identifies the current release.');
+            }
+            const { data: commit } = await github.rest.repos.getCommit({ ...context.repo, ref: `refs/tags/${tag}` });
+            if (!/^[0-9a-f]{40}$/.test(commit.sha)) {
+              throw new Error('The release tag did not resolve to an immutable commit SHA.');
+            }
+            const { data: comparison } = await github.rest.repos.compareCommitsWithBasehead({
+              ...context.repo,
+              basehead: `${commit.sha}...main`
+            });
+            if (!['ahead', 'identical'].includes(comparison.status)) {
+              throw new Error('The release commit is not part of main history.');
+            }
+            core.setOutput('sha', commit.sha);
+            core.setOutput('tag', tag);
+            await core.summary.addHeading('Validated release')
+              .addTable([
+                [{ data: 'Tag', header: true }, { data: 'Immutable commit', header: true }],
+                [tag, commit.sha]
+              ]).write();
+
+      - name: Check AWS deployment settings
+        env:
+          AWS_REGION: ${{ vars.AWS_REGION }}
+          AWS_RELEASE_ROLE_ARN: ${{ vars.AWS_RELEASE_ROLE_ARN }}
+          AWS_PIPELINE_NAME: ${{ vars.AWS_PIPELINE_NAME }}
+        run: |
+          : "${AWS_REGION:?Set staging variable AWS_REGION}"
+          : "${AWS_RELEASE_ROLE_ARN:?Set staging variable AWS_RELEASE_ROLE_ARN}"
+          : "${AWS_PIPELINE_NAME:?Set staging variable AWS_PIPELINE_NAME}"
+
+      - name: Assume release trigger role using OIDC
+        uses: aws-actions/configure-aws-credentials@61815dcd50bd041e203e49132bacad1fd04d2708 # v5
+        with:
+          aws-region: ${{ vars.AWS_REGION }}
+          role-to-assume: ${{ vars.AWS_RELEASE_ROLE_ARN }}
+          role-session-name: fairstation-release-${{ github.run_id }}
+
+      - name: Start pipeline with the exact release commit
+        env:
+          AWS_PIPELINE_NAME: ${{ vars.AWS_PIPELINE_NAME }}
+          RELEASE_SHA: ${{ steps.release.outputs.sha }}
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
+        run: |
+          execution_id=$(aws codepipeline start-pipeline-execution \
+            --name "$AWS_PIPELINE_NAME" \
+            --source-revisions "actionName=SourceAction,revisionType=COMMIT_ID,revisionValue=$RELEASE_SHA" \
+            --variables "name=ReleaseSha,value=$RELEASE_SHA" \
+            --client-request-token "github-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" \
+            --query pipelineExecutionId --output text)
+          printf '### AWS pipeline started\n\nRelease: %s\n\nCommit: %s\n\nPipeline: %s\n\nExecution: %s\n\nDeployment success must be checked in CodePipeline.\n' \
+            "$RELEASE_TAG" "$RELEASE_SHA" "$AWS_PIPELINE_NAME" "$execution_id" >> "$GITHUB_STEP_SUMMARY"

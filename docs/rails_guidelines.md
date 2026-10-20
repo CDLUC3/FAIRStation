@@ -21,9 +21,9 @@ neither is selected by the existing exploratory schema/context documents.
 
 ## Database changes
 
-- FAIR Station owns separate development, test, and production SQLite databases.
-  RAMS access must eventually use its API, never its database or credentials.
-  Keep `DATABASE_URL` unset for the default local setup.
+- FAIR Station owns its development/test SQLite databases and its dedicated
+  production RDS MySQL database. RAMS access must eventually use its API, never its
+  database or credentials. Keep `DATABASE_URL` unset for the default local setup.
 - Generate migrations with `bin/rails generate migration`; commit migrations and
   the generated `db/schema.rb` once there is a schema. Do not hand-edit schema dumps
   or translate the exploratory `SCHEMA.md` into tables without an approved requirement.
@@ -31,8 +31,9 @@ neither is selected by the existing exploratory schema/context documents.
   Use transactions with bang writes or explicit failure handling for atomic changes.
 - Review migrations for existing data, locking, and recoverability. Do not rewrite
   migrations already deployed; destructive changes require an explicit rollout plan.
-- Paginate growing lists and avoid N+1 queries. SQLite production needs persistent
-  storage and backups; changing database engines is an explicit infrastructure decision.
+- Paginate growing lists and avoid N+1 queries. Verify adapter-specific migrations
+  and SQL against MySQL before release; SQLite tests do not prove MySQL compatibility.
+  Database backups and recovery are independent of disposable application containers.
 
 ## Tests and verification
 

@@ -1,0 +1,12 @@
+#!/bin/sh
+set -eu
+
+# A stopped container can leave a server PID behind in a mounted tmp directory.
+# One-off commands (including db:prepare) run without starting or migrating web.
+case "${1:-} ${2:-}" in
+  "bin/rails server" | "./bin/rails server" | "rails server" | "bin/rails s" | "./bin/rails s" | "rails s")
+    rm -f /rails/tmp/pids/server.pid
+    ;;
+esac
+
+exec "$@"

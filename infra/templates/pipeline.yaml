@@ -1,0 +1,320 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Release-only FAIR Station staging pipeline and GitHub OIDC starter role.
+Parameters:
+  ConnectionArn:
+    Type: String
+    Description: Existing AVAILABLE GitHub CodeConnections connection in this region, authorized for CDLUC3/FAIRStation.
+  GitHubOidcProviderArn:
+    Type: String
+    Description: Existing account OIDC provider for token.actions.githubusercontent.com.
+  RepositoryName:
+    Type: String
+  RepositoryUri:
+    Type: String
+  ClusterName:
+    Type: String
+  ServiceName:
+    Type: String
+  TaskDefinitionArn:
+    Type: String
+  ExecutionRoleArn:
+    Type: String
+  TaskRoleArn:
+    Type: String
+  TargetGroupArn:
+    Type: String
+  TaskSecurityGroupId:
+    Type: AWS::EC2::SecurityGroup::Id
+  TaskSubnetIds:
+    Type: List<AWS::EC2::Subnet::Id>
+Resources:
+  Artifacts:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault: {SSEAlgorithm: AES256}
+      VersioningConfiguration: {Status: Enabled}
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      LifecycleConfiguration:
+        Rules:
+          - Id: ExpireArtifacts
+            Status: Enabled
+            ExpirationInDays: 90
+            NoncurrentVersionExpiration: {NoncurrentDays: 30}
+            AbortIncompleteMultipartUpload: {DaysAfterInitiation: 7}
+  ArtifactPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref Artifacts
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Deny
+            Principal: '*'
+            Action: s3:*
+            Resource: [!GetAtt Artifacts.Arn, !Sub '${Artifacts.Arn}/*']
+            Condition:
+              Bool: {aws:SecureTransport: 'false'}
+  BuildLogs:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      LogGroupName: /aws/codebuild/fairstation-stg
+      RetentionInDays: 30
+  BuildRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal: {Service: codebuild.amazonaws.com}
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: ImageBuild
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: [logs:CreateLogStream, logs:PutLogEvents]
+                Resource: !GetAtt BuildLogs.Arn
+              - Effect: Allow
+                Action: [s3:GetBucketLocation, s3:GetBucketVersioning]
+                Resource: !GetAtt Artifacts.Arn
+              - Effect: Allow
+                Action: [s3:GetObject, s3:GetObjectVersion, s3:PutObject]
+                Resource: !Sub '${Artifacts.Arn}/*'
+              - Effect: Allow
+                Action: ecr:GetAuthorizationToken
+                Resource: '*'
+              - Effect: Allow
+                Action: [ecr:DescribeImages, ecr:BatchGetImage, ecr:GetDownloadUrlForLayer, ecr:BatchCheckLayerAvailability, ecr:InitiateLayerUpload, ecr:UploadLayerPart, ecr:CompleteLayerUpload, ecr:PutImage]
+                Resource: !Sub arn:${AWS::Partition}:ecr:${AWS::Region}:${AWS::AccountId}:repository/${RepositoryName}
+  DeploymentRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal: {Service: codebuild.amazonaws.com}
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: ReleaseDeployment
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: [logs:CreateLogStream, logs:PutLogEvents]
+                Resource: !GetAtt BuildLogs.Arn
+              - Effect: Allow
+                Action: [s3:GetBucketLocation, s3:GetBucketVersioning]
+                Resource: !GetAtt Artifacts.Arn
+              - Effect: Allow
+                Action: [s3:GetObject, s3:GetObjectVersion, s3:PutObject]
+                Resource: !Sub '${Artifacts.Arn}/*'
+              - Effect: Allow
+                Action: ecs:RegisterTaskDefinition
+                Resource: '*'
+              - Effect: Allow
+                Action: ecs:DescribeTaskDefinition
+                Resource: '*'
+              - Effect: Allow
+                Action: ecs:RunTask
+                Resource: !Sub arn:${AWS::Partition}:ecs:${AWS::Region}:${AWS::AccountId}:task-definition/fairstation-stg-web:*
+                Condition:
+                  ArnEquals:
+                    ecs:cluster: !Sub arn:${AWS::Partition}:ecs:${AWS::Region}:${AWS::AccountId}:cluster/${ClusterName}
+              - Effect: Allow
+                Action: [ecs:DescribeTasks, ecs:StopTask]
+                Resource: !Sub arn:${AWS::Partition}:ecs:${AWS::Region}:${AWS::AccountId}:task/${ClusterName}/*
+                Condition:
+                  ArnEquals:
+                    ecs:cluster: !Sub arn:${AWS::Partition}:ecs:${AWS::Region}:${AWS::AccountId}:cluster/${ClusterName}
+              - Effect: Allow
+                Action: [ecs:DescribeServices, ecs:UpdateService]
+                Resource: !Sub arn:${AWS::Partition}:ecs:${AWS::Region}:${AWS::AccountId}:service/${ClusterName}/${ServiceName}
+              - Effect: Allow
+                Action: elasticloadbalancing:DescribeTargetHealth
+                Resource: '*'
+              - Effect: Allow
+                Action: iam:PassRole
+                Resource: [!Ref ExecutionRoleArn, !Ref TaskRoleArn]
+                Condition:
+                  StringEquals: {iam:PassedToService: ecs-tasks.amazonaws.com}
+  BuildProject:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Name: fairstation-stg-build
+      ServiceRole: !GetAtt BuildRole.Arn
+      TimeoutInMinutes: 30
+      Artifacts: {Type: CODEPIPELINE}
+      Source: {Type: CODEPIPELINE, BuildSpec: infra/buildspec-build.yaml}
+      LogsConfig:
+        CloudWatchLogs: {Status: ENABLED, GroupName: !Ref BuildLogs}
+      Environment:
+        Type: LINUX_CONTAINER
+        Image: aws/codebuild/standard:7.0
+        ComputeType: BUILD_GENERAL1_MEDIUM
+        PrivilegedMode: true
+        EnvironmentVariables:
+          - {Name: REPOSITORY_NAME, Value: !Ref RepositoryName}
+          - {Name: REPOSITORY_URI, Value: !Ref RepositoryUri}
+  MigrationProject:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Name: fairstation-stg-migrate
+      ServiceRole: !GetAtt DeploymentRole.Arn
+      TimeoutInMinutes: 40
+      Artifacts: {Type: CODEPIPELINE}
+      Source: {Type: CODEPIPELINE, BuildSpec: infra/buildspec-migrate.yaml}
+      LogsConfig:
+        CloudWatchLogs: {Status: ENABLED, GroupName: !Ref BuildLogs}
+      Environment:
+        Type: LINUX_CONTAINER
+        Image: aws/codebuild/standard:7.0
+        ComputeType: BUILD_GENERAL1_SMALL
+        PrivilegedMode: false
+        EnvironmentVariables:
+          - {Name: ECS_CLUSTER, Value: !Ref ClusterName}
+          - {Name: BASE_TASK_DEFINITION, Value: !Ref TaskDefinitionArn}
+          - {Name: REPOSITORY_URI, Value: !Ref RepositoryUri}
+          - {Name: TASK_SUBNETS, Value: !Join [',', !Ref TaskSubnetIds]}
+          - {Name: TASK_SECURITY_GROUP, Value: !Ref TaskSecurityGroupId}
+  DeployProject:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Name: fairstation-stg-deploy
+      ServiceRole: !GetAtt DeploymentRole.Arn
+      TimeoutInMinutes: 30
+      Artifacts: {Type: CODEPIPELINE}
+      Source: {Type: CODEPIPELINE, BuildSpec: infra/buildspec-deploy.yaml}
+      LogsConfig:
+        CloudWatchLogs: {Status: ENABLED, GroupName: !Ref BuildLogs}
+      Environment:
+        Type: LINUX_CONTAINER
+        Image: aws/codebuild/standard:7.0
+        ComputeType: BUILD_GENERAL1_SMALL
+        PrivilegedMode: false
+        EnvironmentVariables:
+          - {Name: ECS_CLUSTER, Value: !Ref ClusterName}
+          - {Name: ECS_SERVICE, Value: !Ref ServiceName}
+          - {Name: REPOSITORY_URI, Value: !Ref RepositoryUri}
+          - {Name: TARGET_GROUP_ARN, Value: !Ref TargetGroupArn}
+  PipelineRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal: {Service: codepipeline.amazonaws.com}
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: PipelineActions
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: [s3:GetBucketLocation, s3:GetBucketVersioning, s3:GetBucketAcl]
+                Resource: !GetAtt Artifacts.Arn
+              - Effect: Allow
+                Action: [s3:GetObject, s3:GetObjectVersion, s3:PutObject]
+                Resource: !Sub '${Artifacts.Arn}/*'
+              - Effect: Allow
+                Action: [codeconnections:UseConnection, codestar-connections:UseConnection]
+                Resource: !Ref ConnectionArn
+              - Effect: Allow
+                Action: [codebuild:StartBuild, codebuild:BatchGetBuilds]
+                Resource: [!GetAtt BuildProject.Arn, !GetAtt MigrationProject.Arn, !GetAtt DeployProject.Arn]
+  Pipeline:
+    Type: AWS::CodePipeline::Pipeline
+    Properties:
+      Name: fairstation-stg
+      PipelineType: V2
+      ExecutionMode: QUEUED
+      RestartExecutionOnUpdate: false
+      Variables:
+        - Name: ReleaseSha
+          Description: Exact published release SHA; required for explicit release starts.
+      RoleArn: !GetAtt PipelineRole.Arn
+      ArtifactStore: {Type: S3, Location: !Ref Artifacts}
+      Stages:
+        - Name: Source
+          Actions:
+            - Name: SourceAction
+              Namespace: SourceVariables
+              ActionTypeId: {Category: Source, Owner: AWS, Provider: CodeStarSourceConnection, Version: '1'}
+              Configuration:
+                ConnectionArn: !Ref ConnectionArn
+                FullRepositoryId: CDLUC3/FAIRStation
+                BranchName: main
+                DetectChanges: 'false'
+                OutputArtifactFormat: CODE_ZIP
+              OutputArtifacts: [{Name: SourceOutput}]
+        - Name: Build
+          Actions:
+            - Name: BuildAction
+              ActionTypeId: {Category: Build, Owner: AWS, Provider: CodeBuild, Version: '1'}
+              Configuration:
+                ProjectName: !Ref BuildProject
+                EnvironmentVariables: '[{"name":"SOURCE_SHA","value":"#{SourceVariables.CommitId}","type":"PLAINTEXT"},{"name":"RELEASE_SHA","value":"#{variables.ReleaseSha}","type":"PLAINTEXT"}]'
+              InputArtifacts: [{Name: SourceOutput}]
+              OutputArtifacts: [{Name: ImageOutput}]
+        - Name: Migrate
+          Actions:
+            - Name: MigrateAction
+              ActionTypeId: {Category: Build, Owner: AWS, Provider: CodeBuild, Version: '1'}
+              Configuration:
+                ProjectName: !Ref MigrationProject
+                PrimarySource: SourceOutput
+                EnvironmentVariables: '[{"name":"SOURCE_SHA","value":"#{SourceVariables.CommitId}","type":"PLAINTEXT"},{"name":"RELEASE_SHA","value":"#{variables.ReleaseSha}","type":"PLAINTEXT"}]'
+              InputArtifacts: [{Name: SourceOutput}, {Name: ImageOutput}]
+              OutputArtifacts: [{Name: DeploymentOutput}]
+        - Name: Deploy
+          Actions:
+            - Name: DeployAction
+              ActionTypeId: {Category: Build, Owner: AWS, Provider: CodeBuild, Version: '1'}
+              Configuration:
+                ProjectName: !Ref DeployProject
+                PrimarySource: SourceOutput
+                EnvironmentVariables: '[{"name":"SOURCE_SHA","value":"#{SourceVariables.CommitId}","type":"PLAINTEXT"},{"name":"RELEASE_SHA","value":"#{variables.ReleaseSha}","type":"PLAINTEXT"}]'
+              InputArtifacts: [{Name: SourceOutput}, {Name: DeploymentOutput}]
+  GitHubReleaseRole:
+    Type: AWS::IAM::Role
+    Properties:
+      Description: GitHub staging environment may start only the FAIR Station staging pipeline.
+      MaxSessionDuration: 3600
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal: {Federated: !Ref GitHubOidcProviderArn}
+            Action: sts:AssumeRoleWithWebIdentity
+            Condition:
+              StringEquals:
+                token.actions.githubusercontent.com:aud: sts.amazonaws.com
+                token.actions.githubusercontent.com:sub: repo:CDLUC3/FAIRStation:environment:staging
+      Policies:
+        - PolicyName: StartRelease
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: codepipeline:StartPipelineExecution
+                Resource: !Sub arn:${AWS::Partition}:codepipeline:${AWS::Region}:${AWS::AccountId}:${Pipeline}
+Outputs:
+  PipelineName:
+    Value: !Ref Pipeline
+  GitHubReleaseRoleArn:
+    Value: !GetAtt GitHubReleaseRole.Arn
+  ArtifactBucketName:
+    Value: !Ref Artifacts

@@ -15,12 +15,21 @@ test:
   <<: *default
   database: storage/test.sqlite3
 
-# SQLite3 write its data on the local filesystem, as such it requires
-# persistent disks. If you are deploying to a managed service, you should
-# make sure it provides disk persistence, as many don't.
-#
-# Similarly, if you deploy your application as a Docker container, you must
-# ensure the database is located in a persisted volume.
+# Production never uses local SQLite storage. Build-time asset compilation does
+# not connect to a database; runtime requires either a MySQL URL or all fields.
 production:
-  <<: *default
-  database: <%= ENV.fetch("FAIR_STATION_DATABASE_PATH", "storage/production.sqlite3") %>
+  adapter: mysql2
+  encoding: utf8mb4
+  max_connections: <%= ENV.fetch("RAILS_MAX_THREADS") { 5 } %>
+<% if Rails.env.production? && !ENV["SECRET_KEY_BASE_DUMMY"] %>
+<% if ENV["DATABASE_URL"].present? %>
+<% raise "DATABASE_URL must use mysql2:// in production" unless ENV["DATABASE_URL"].start_with?("mysql2://") %>
+  url: <%= ENV.fetch("DATABASE_URL").to_json %>
+<% else %>
+  host: <%= ENV.fetch("DATABASE_HOST").to_json %>
+  port: <%= ENV.fetch("DATABASE_PORT").to_json %>
+  database: <%= ENV.fetch("DATABASE_NAME").to_json %>
+  username: <%= ENV.fetch("DATABASE_USERNAME").to_json %>
+  password: <%= ENV.fetch("DATABASE_PASSWORD").to_json %>
+<% end %>
+<% end %>

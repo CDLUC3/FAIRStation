@@ -15,10 +15,10 @@ liveness check at `/up`. Research review, source integrations, and sign-in are
 not implemented; the research model and identity provider remain undecided.
 
 The stack is Ruby **4.0.6**, Rails **8.1.4** (locked in `Gemfile.lock`), Puma,
-SQLite, ERB, Hotwire (Turbo and Stimulus), importmap, and Propshaft. SQLite keeps
-the bootstrap self-contained; no database server, Node, Redis, or RAMS access is
-needed. This repository had no existing application, CI, or deployment setup to
-constrain these choices.
+ERB, Hotwire (Turbo and Stimulus), importmap, and Propshaft. SQLite keeps local
+development and tests self-contained; AWS production-mode deployments use a
+dedicated FAIR Station RDS MySQL database. No database server, Node, Redis, or
+RAMS access is needed for local development.
 
 ## Local setup
 
@@ -30,6 +30,13 @@ constrain these choices.
    gem install bundler -v 4.0.19
    bundle --version
    ```
+
+   The `mysql2` gem also needs MySQL client development libraries, even when
+   running the SQLite-backed development app. On macOS install `mysql-client`
+   and `pkg-config` with Homebrew; if discovery fails, configure Bundler with
+   `bundle config set --local build.mysql2 --with-mysql-config="$(brew --prefix mysql-client)/bin/mysql_config"`.
+   On Debian/Ubuntu install `default-libmysqlclient-dev`, `build-essential`, and
+   `pkg-config`. The production Dockerfile installs its own build/runtime libraries.
 
    Ruby native extensions require a compiler toolchain (Xcode Command Line Tools
    on macOS or build-essential on Linux). Run commands from the repository root.
@@ -65,7 +72,8 @@ bin/ci
 
 It runs setup, RuboCop, Bundler Audit, importmap audit, Brakeman, test database
 preparation, Minitest, and Zeitwerk's autoloading check. Dependency audits need
-network access. GitHub Actions runs it for pull requests and pushes to `main`.
+network access. GitHub Actions runs it for pull requests and pushes to `development`
+and `main`; the separate `policy` check enforces PR routing and Conventional Commit titles.
 
 For focused checks:
 
@@ -91,8 +99,8 @@ RAMS availability, or readiness of future integrations.
 
 ## Configuration and secrets
 
-- `config/database.yml` defines separate SQLite files under `storage/` for
-  development, test, and production. They belong exclusively to FAIR Station.
+- `config/database.yml` defines separate local development/test SQLite files and
+  a MySQL production connection. All databases belong exclusively to FAIR Station.
   Never configure a RAMS database connection; eventual RAMS access uses its API.
 - `.ruby-version` and `Gemfile.lock` pin the toolchain and dependencies.
   `config/environments/` holds environment-specific Rails settings.
@@ -109,36 +117,42 @@ RAMS availability, or readiness of future integrations.
   caches, and compiled assets. `.env` files are **not automatically loaded**.
   Filter sensitive parameters in `config/initializers/filter_parameter_logging.rb`.
 
-## Deployment constraints
+## Release and deployment
 
-No hosting provider or deployment mechanism is selected. Production configuration
-expects an HTTPS-terminating reverse proxy; do not expose Puma directly to the
-internet. Before deployment, select the hostname/host allowlist, secret store,
-persistent storage, and backup/restore policy.
+Feature PRs target `development` with Conventional Commit titles and squash merges.
+Promote `development` to `main` with a **merge commit**, never squash or rebase.
+Release-please then opens or updates a version/changelog PR against `main`.
+Review and merge that PR with a merge commit to publish the GitHub release.
+Merge `main` back into `development` through a PR after each release.
 
-The private [ngRAMS documentation](https://github.com/CDLUC3/ngRAMS-doc) describes
-existing RAMS production and AWS development/staging operations and links to
-[ngRAMS infrastructure](https://github.com/CDLUC3/ngrams-infrastructure).
-Those instructions target `UCNRS-RAMS/ucnrs-rams`; deployment of this separate
-FAIR Station application still needs to be mapped to that infrastructure.
-SQLite is the verified local baseline, not a confirmed choice for that AWS setup.
-Any deployed FAIR Station database must remain separate from RAMS.
+Published stable releases trigger the AWS pipeline with the exact released commit.
+CodeBuild builds the production image, a one-off ECS task prepares the database,
+and ECS deploys the same image. The GitHub workflow reports pipeline submission;
+check CodePipeline for migration and deployment success.
 
-SQLite defaults to `storage/production.sqlite3`. Set `FAIR_STATION_DATABASE_PATH`
-to a writable path on a persistent disk if needed. Do not use ephemeral storage or
-independent database files across replicas. A future multi-host deployment may
-justify a dedicated PostgreSQL database; that choice is not required for local work.
+- [Architecture decisions](docs/architecture_decisions.md): stack, persistence,
+  branch/release model, migration ordering, and secrets boundaries.
+- [GitHub setup](docs/github_setup.md): administrator configuration, release App,
+  protected branches, and deployment variables.
+- [AWS staging setup](infra/README.md): infrastructure inputs, provisioning,
+  runtime secrets, deployment, and rollback.
 
-With production secrets and persistent storage provisioned, the Rails commands are:
+Configuration in the repository does **not** mean AWS staging is deployed.
+The deployment requires authorized AWS access and provisioned FAIR Station
+resources. Do not reuse RAMS's database, credentials, or application certificate.
 
-```sh
-RAILS_ENV=production bin/rails db:prepare
-RAILS_ENV=production bin/rails assets:precompile
-RAILS_ENV=production bin/rails server
-```
+The production image runs as a nonroot user on port 3000 behind an HTTPS-terminating
+ALB. Inject `SECRET_KEY_BASE`, `RAILS_ALLOWED_HOSTS` (comma-separated hostnames),
+and `DATABASE_HOST`, `DATABASE_PORT`, `DATABASE_NAME`, `DATABASE_USERNAME`,
+`DATABASE_PASSWORD` at runtime. A `mysql2://` `DATABASE_URL` is also supported
+instead of the separate database fields. Never inject `SECRET_KEY_BASE_DUMMY`
+at runtime; it is only used for image-build asset compilation.
 
-Configure the platform's liveness probe to request `/up`. Production logs go to
-standard output. These commands are not a hosting, TLS, or backup configuration.
+Build locally with `docker build -t fairstation:local .`. Run database preparation
+as a separate `bin/rails db:prepare` container command; web startup does not migrate.
+Configure the ALB health check to request `/up`. Rails logs go to standard output.
+Do not expose Puma directly to the internet or store production data on container
+disk. No research data or authenticated surface is implemented yet.
 
 ## Contributor guidance
 

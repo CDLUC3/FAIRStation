@@ -16,3 +16,4 @@
 !/storage/.keep
 /public/assets/
 /vendor/bundle/
+/infra/__pycache__/

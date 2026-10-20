@@ -1,0 +1,44 @@
+# Only application runtime sources enter the build context.
+**
+!.ruby-version
+!Gemfile
+!Gemfile.lock
+!Rakefile
+!config.ru
+!app/
+!app/**
+!bin/
+!bin/**
+!config/
+!config/**
+!db/
+!db/migrate/
+!db/migrate/**
+!db/schema.rb
+!db/seeds.rb
+!lib/
+!lib/**
+!public/
+!public/**
+!vendor/
+!vendor/javascript/
+!vendor/javascript/**
+
+# Keep local secrets, databases, generated assets and caches out even when they
+# appear under an otherwise permitted application directory.
+**/.env*
+**/*.key
+**/*.pem
+**/*.p12
+**/credentials*
+**/*.sqlite*
+**/*.db
+**/*.db-*
+**/*.sql
+**/*.dump
+**/*.log
+**/node_modules
+**/.DS_Store
+**/*~
+**/*.swp
+public/assets

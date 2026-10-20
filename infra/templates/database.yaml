@@ -1,0 +1,109 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Dedicated FAIR Station staging MySQL and runtime parameter contract.
+Parameters:
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+  DatabaseSubnetIds:
+    Type: List<AWS::EC2::Subnet::Id>
+    Description: Private subnets in at least two availability zones.
+  DatabaseInstanceClass:
+    Type: String
+    Default: db.t4g.micro
+  DatabaseEngineVersion:
+    Type: String
+    Default: '8.4.11'
+    Description: Exact supported regional MySQL 8.4 engine version; confirm availability before provisioning.
+    AllowedPattern: '8\.4\.[0-9]+'
+  MultiAZ:
+    Type: String
+    Default: 'false'
+    AllowedValues: ['true', 'false']
+Conditions:
+  UseMultiAZ: !Equals [!Ref MultiAZ, 'true']
+Resources:
+  TaskSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: FAIR Station staging tasks; inbound supplied by runtime stack
+      VpcId: !Ref VpcId
+  DatabaseSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: MySQL accessible only by FAIR Station staging tasks
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 3306
+          ToPort: 3306
+          SourceSecurityGroupId: !Ref TaskSecurityGroup
+  SubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupDescription: Dedicated FAIR Station staging database subnets
+      SubnetIds: !Ref DatabaseSubnetIds
+  DatabaseSecret:
+    Type: AWS::SecretsManager::Secret
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      Name: /uc3/fairstation/stg/database
+      Description: Dedicated FAIR Station MySQL credentials; operator-coordinated rotation only.
+      GenerateSecretString:
+        SecretStringTemplate: '{"username":"fairstation_admin"}'
+        GenerateStringKey: password
+        PasswordLength: 40
+        ExcludePunctuation: true
+  Database:
+    Type: AWS::RDS::DBInstance
+    DeletionPolicy: Snapshot
+    UpdateReplacePolicy: Snapshot
+    Properties:
+      DBInstanceIdentifier: fairstation-stg-mysql
+      DBName: fairstation
+      Engine: mysql
+      EngineVersion: !Ref DatabaseEngineVersion
+      DBInstanceClass: !Ref DatabaseInstanceClass
+      AllocatedStorage: '20'
+      MaxAllocatedStorage: 100
+      StorageType: gp3
+      StorageEncrypted: true
+      MasterUsername: !Sub '{{resolve:secretsmanager:${DatabaseSecret}:SecretString:username}}'
+      MasterUserPassword: !Sub '{{resolve:secretsmanager:${DatabaseSecret}:SecretString:password}}'
+      DBSubnetGroupName: !Ref SubnetGroup
+      VPCSecurityGroups: [!Ref DatabaseSecurityGroup]
+      PubliclyAccessible: false
+      MultiAZ: !If [UseMultiAZ, true, false]
+      BackupRetentionPeriod: 14
+      PreferredBackupWindow: '08:00-09:00'
+      PreferredMaintenanceWindow: 'sun:10:00-sun:11:00'
+      DeletionProtection: true
+      CopyTagsToSnapshot: true
+      AutoMinorVersionUpgrade: true
+      EnableCloudwatchLogsExports: [error, slowquery]
+  DatabaseHost:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: /uc3/fairstation/stg/RdsHost
+      Type: String
+      Value: !GetAtt Database.Endpoint.Address
+  DatabasePort:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: /uc3/fairstation/stg/RdsPort
+      Type: String
+      Value: !GetAtt Database.Endpoint.Port
+  DatabaseName:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: /uc3/fairstation/stg/RdsName
+      Type: String
+      Value: fairstation
+Outputs:
+  TaskSecurityGroupId:
+    Value: !Ref TaskSecurityGroup
+  DatabaseSecretArn:
+    Value: !Ref DatabaseSecret
+  DatabaseEndpoint:
+    Value: !GetAtt Database.Endpoint.Address
+  DatabaseInstanceId:
+    Value: !Ref Database
