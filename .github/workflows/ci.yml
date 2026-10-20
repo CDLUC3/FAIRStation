@@ -2,18 +2,43 @@ name: CI
 
 on:
   pull_request:
+    types: [opened, synchronize, reopened, edited, ready_for_review]
   push:
-    branches: [ main ]
+    branches: [development, main]
 
 permissions:
   contents: read
 
 jobs:
+  policy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check pull request policy
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
+        with:
+          script: |
+            const pr = context.payload.pull_request;
+            const sameRepository = pr.head.repo?.full_name === `${context.repo.owner}/${context.repo.repo}`;
+            const promotion = pr.base.ref === 'main' && sameRepository && pr.head.ref === 'development';
+            const release = pr.base.ref === 'main' && sameRepository && pr.head.ref === 'release-please--branches--main';
+            if (pr.base.ref === 'main' && !promotion && !release) {
+              core.setFailed('main accepts only development promotions and release PRs.');
+              return;
+            }
+            if (!/^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\([^)]+\))?!?: \S[^\r\n]*$/.test(pr.title)) {
+              core.setFailed('Use a Conventional Commit PR title, for example: feat: add dataset search.');
+              return;
+            }
+            if (promotion || release) {
+              core.notice('Squash and merge; a merge commit would replay released commits into release-please.');
+            }
+
   checks:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
 
       - name: Set up Ruby
         uses: ruby/setup-ruby@v1

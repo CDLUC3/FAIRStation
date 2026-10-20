@@ -17,8 +17,7 @@ not implemented; the research model and identity provider remain undecided.
 The stack is Ruby **4.0.6**, Rails **8.1.4** (locked in `Gemfile.lock`), Puma,
 SQLite, ERB, Hotwire (Turbo and Stimulus), importmap, and Propshaft. SQLite keeps
 the bootstrap self-contained; no database server, Node, Redis, or RAMS access is
-needed. This repository had no existing application, CI, or deployment setup to
-constrain these choices.
+needed.
 
 ## Local setup
 
@@ -65,7 +64,8 @@ bin/ci
 
 It runs setup, RuboCop, Bundler Audit, importmap audit, Brakeman, test database
 preparation, Minitest, and Zeitwerk's autoloading check. Dependency audits need
-network access. GitHub Actions runs it for pull requests and pushes to `main`.
+network access. GitHub Actions runs it for pull requests and pushes to `development`
+and `main`; the separate `policy` check enforces PR routing and Conventional Commit titles.
 
 For focused checks:
 
@@ -109,36 +109,22 @@ RAMS availability, or readiness of future integrations.
   caches, and compiled assets. `.env` files are **not automatically loaded**.
   Filter sensitive parameters in `config/initializers/filter_parameter_logging.rb`.
 
-## Deployment constraints
+## Workflow and releases
 
-No hosting provider or deployment mechanism is selected. Production configuration
-expects an HTTPS-terminating reverse proxy; do not expose Puma directly to the
-internet. Before deployment, select the hostname/host allowlist, secret store,
-persistent storage, and backup/restore policy.
+Feature PRs target `development`, use a Conventional Commit title, and squash.
+Promotions (`development` → `main`) also squash and are titled with what ships; a
+merge commit would replay released work into release-please. Release Please then
+opens a version/changelog PR against `main`. Review it and squash-merge to publish
+the GitHub release and tag. Merge `main` back into `development` before the next
+promotion.
 
-The private [ngRAMS documentation](https://github.com/CDLUC3/ngRAMS-doc) describes
-existing RAMS production and AWS development/staging operations and links to
-[ngRAMS infrastructure](https://github.com/CDLUC3/ngrams-infrastructure).
-Those instructions target `UCNRS-RAMS/ucnrs-rams`; deployment of this separate
-FAIR Station application still needs to be mapped to that infrastructure.
-SQLite is the verified local baseline, not a confirmed choice for that AWS setup.
-Any deployed FAIR Station database must remain separate from RAMS.
+- [Git conventions](docs/git_conventions.md): commit, branch, PR, and promotion rules.
+- [GitHub setup](docs/github_setup.md): protections, release token, and release steps.
+- [Architecture decisions](docs/architecture_decisions.md): stack and branch decisions.
 
-SQLite defaults to `storage/production.sqlite3`. Set `FAIR_STATION_DATABASE_PATH`
-to a writable path on a persistent disk if needed. Do not use ephemeral storage or
-independent database files across replicas. A future multi-host deployment may
-justify a dedicated PostgreSQL database; that choice is not required for local work.
-
-With production secrets and persistent storage provisioned, the Rails commands are:
-
-```sh
-RAILS_ENV=production bin/rails db:prepare
-RAILS_ENV=production bin/rails assets:precompile
-RAILS_ENV=production bin/rails server
-```
-
-Configure the platform's liveness probe to request `/up`. Production logs go to
-standard output. These commands are not a hosting, TLS, or backup configuration.
+AWS deployment is deferred. There is no production container or deployed
+environment; publishing a release currently changes no runtime. The build and
+deploy design is recorded in the deferred section of the architecture decisions.
 
 ## Contributor guidance
 
