@@ -2,9 +2,9 @@
 
 ## Bootstrap order
 
-1. Land these workflows on `development`, then promote them to `main`. Both
-   branches must contain the `checks` and `policy` CI jobs before protection can
-   require them.
+1. Land these workflows on `development`, then promote them to `main` with a
+   merge commit titled `Release: ...`. Both branches must contain the `checks`
+   and `policy` CI jobs before protection can require them.
 2. Have a repository administrator run `bin/configure-github --apply`. Preview
    first; the apply step refuses a non-admin account before changing anything.
 3. Add the `RELEASE_PLEASE_TOKEN` secret described below.
