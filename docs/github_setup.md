@@ -2,13 +2,12 @@
 
 ## Bootstrap order
 
-1. Land these workflows on `development`, then promote them to `main` with a
-   merge commit titled `Release: ...`. Both branches must contain the `checks`
-   and `policy` CI jobs before protection can require them.
+1. Land these workflows on `main`. `main` must contain the `checks` and `policy`
+   CI jobs before protection can require them.
 2. Have a repository administrator run `bin/configure-github --apply`. Preview
    first; the apply step refuses a non-admin account before changing anything.
 3. Add the `RELEASE_PLEASE_TOKEN` secret described below.
-4. Make a promotion and review the resulting release PR.
+4. Merge a releasable PR and review the resulting release PR.
 
 AWS deployment is not part of this setup yet. See #31 and
 [architecture decisions](architecture_decisions.md).
@@ -17,18 +16,14 @@ AWS deployment is not part of this setup yet. See #31 and
 
 `bin/configure-github` configures:
 
-- `development` default; features squash, and a merge commit is allowed for
-  syncing `main` back.
-- `main`: merge only — never squash. Both promotions and release PRs merge.
-- `development` and `main`: no force push or deletion; PRs require the `checks`
-  and `policy` jobs and resolved conversations. No configured bypass actors.
+- `main` default; squash only — no merge commits, no rebase.
+- `main`: no force push or deletion; PRs require the `checks` and `policy` jobs
+  and resolved conversations. No configured bypass actors.
 - `v*` tags: creation allowed, update and deletion blocked.
 
-The `policy` job accepts `main` PRs only from this repository's `development`
-branch or `release-please--branches--main`. Feature PR titles use the
-Conventional Commit format. Promotion PRs use `Release: <summary>`; release PRs
-use Release Please's generated `chore(main): release ...` title. Title edits
-rerun the check.
+The `policy` job requires every PR to target `main` and use a Conventional
+Commit title. Release Please's generated `chore(main): release ...` title passes.
+Title edits rerun the check.
 
 ## Release token
 
@@ -46,14 +41,9 @@ other workflows.
 
 ## Routine release
 
-1. Squash feature PRs into `development`, titled in commit format.
-2. Merge `main` into `development` and push, so promotion does not revert release
-   metadata.
-3. Open a `development` → `main` PR titled `Release: promote development to
-   main`. Merge it with a merge commit.
-4. Review Release Please's version/changelog PR against `main`; merge it with a
-   merge commit. That publishes the release and tag.
-5. Merge `main` into `development` again for the next cycle.
+1. Squash feature PRs into `main`, titled in commit format.
+2. Review Release Please's version/changelog PR against `main`; squash-merge it.
+   That publishes the release and tag.
 
 To reconcile after a transient failure, without inventing a tag:
 
@@ -61,6 +51,6 @@ To reconcile after a transient failure, without inventing a tag:
 gh workflow run release-please.yml --ref main
 ```
 
-If Release Please's PR conflicts on release files, resolve them to
-`development`'s side and prove the resolution with tree diffs; see
-[git conventions](git_conventions.md).
+If Release Please's PR conflicts on release files, resolve the conflict on its
+branch and prove the resulting tree matches `main` plus the version and changelog
+changes; see [git conventions](git_conventions.md).

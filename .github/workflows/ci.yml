@@ -4,7 +4,7 @@ on:
   pull_request:
     types: [opened, synchronize, reopened, edited, ready_for_review]
   push:
-    branches: [development, main]
+    branches: [main]
 
 permissions:
   contents: read
@@ -19,25 +19,15 @@ jobs:
         with:
           script: |
             const pr = context.payload.pull_request;
-            const sameRepository = pr.head.repo?.full_name === `${context.repo.owner}/${context.repo.repo}`;
-            const promotion = pr.base.ref === 'main' && sameRepository && pr.head.ref === 'development';
-            const release = pr.base.ref === 'main' && sameRepository && pr.head.ref === 'release-please--branches--main';
-            if (pr.base.ref === 'main' && !promotion && !release) {
-              core.setFailed('main accepts only development promotions and release PRs.');
+            if (pr.base.ref !== 'main') {
+              core.setFailed('Pull requests must target main.');
               return;
             }
-            if (promotion) {
-              if (!/^Release: \S[^\r\n]*$/.test(pr.title)) {
-                core.setFailed('Title promotions as "Release: <summary>".');
-                return;
-              }
-            } else if (!/^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\([^)]+\))?!?: \S[^\r\n]*$/.test(pr.title)) {
+            if (!/^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\([^)]+\))?!?: \S[^\r\n]*$/.test(pr.title)) {
               core.setFailed('Use a Conventional Commit PR title, for example: feat: add dataset search.');
               return;
             }
-            if (promotion || release) {
-              core.notice('Merge with a merge commit; main allows merge only.');
-            }
+            core.notice('Squash and merge.');
 
   checks:
     runs-on: ubuntu-latest

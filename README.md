@@ -64,9 +64,9 @@ bin/ci
 
 It runs setup, RuboCop, Bundler Audit, importmap audit, Brakeman, test database
 preparation, Minitest, and Zeitwerk's autoloading check. Dependency audits need
-network access. GitHub Actions runs it for pull requests and pushes to `development`
-and `main`; the separate `policy` check enforces PR routing and the title rules
-for feature, promotion, and release PRs.
+network access. GitHub Actions runs it for pull requests and pushes to `main`;
+the separate `policy` check enforces the target branch and Conventional Commit
+titles.
 
 For focused checks:
 
@@ -112,14 +112,11 @@ RAMS availability, or readiness of future integrations.
 
 ## Workflow and releases
 
-Feature PRs target `development`, use a Conventional Commit title, and squash.
-Promotions (`development` → `main`) merge, never squash, and are titled as a
-release (`Release: promote development to main`). The merge preserves the
-individual commits Release Please reads. Release Please then opens a
-version/changelog PR against `main`. Review it and merge it to publish the GitHub
-release and tag. Merge `main` back into `development` before the next promotion.
+Feature PRs target `main`, use a Conventional Commit title, and squash. Release
+Please watches `main` and opens a version/changelog PR; review it and squash-merge
+it to publish the GitHub release and tag. There is no separate integration branch.
 
-- [Git conventions](docs/git_conventions.md): commit, branch, PR, and promotion rules.
+- [Git conventions](docs/git_conventions.md): commit, branch, PR, and release rules.
 - [GitHub setup](docs/github_setup.md): protections, release token, and release steps.
 - [Architecture decisions](docs/architecture_decisions.md): stack and branch decisions.
 

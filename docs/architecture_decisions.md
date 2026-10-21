@@ -20,27 +20,19 @@ deferred; nothing here claims a deployed environment.
 
 ## Branches and releases
 
-- **`development` is the integration and default branch; `main` is released.**
-  Feature PRs target `development`; promotions and release PRs target `main`.
-- **Feature PR titles use Conventional Commits; promotion titles name the
-  release.** Feature PRs squash, so their titles become commit subjects.
-  Promotions merge, never squash: the merge preserves the individual commits
-  Release Please reads. Title promotions `Release: ...`; do not encode a single
-  feature or a version in the title.
-- **Do not mix merge and squash promotions.** A squashed promotion leaves its
-  original commits only on `development`, so a later merge replays them into
-  Release Please's range. This repository is pre-release, so it can adopt merge
-  promotions without inherited history.
-- **Merge `main` back into `development` before each promotion**, so the
-  promotion diff does not revert `version.txt`, `CHANGELOG.md`, or the release
-  manifest.
-- **Review Release Please's PR before it publishes.** Merging it creates the
-  version tag and GitHub release. It is a human gate, not automatic publishing.
-- **Both long-lived branches require PRs and CI.** Protect against force pushes
-  and deletion; keep `main` merge-only. Details and setup live in
+- **`main` is the trunk and the released branch.** Feature PRs target `main` and
+  squash; there is no long-lived integration branch.
+- **All PR titles use Conventional Commits.** A squash merge turns the title
+  into the commit subject Release Please reads. Release Please's own release PR
+  uses `chore(main): release ...`.
+- **Review Release Please's PR before it publishes.** Squash-merging it creates
+  the version tag and GitHub release. It is a human gate, not automatic
+  publishing.
+- **`main` requires PRs and CI.** Protect against force pushes and deletion;
+  keep `main` squash-only. Details and setup live in
   [GitHub setup](github_setup.md).
 - **Release metadata stays on `main`.** Do not cherry-pick or rewrite release
-  history; sync `main` into `development` instead.
+  history.
 
 ## Deferred: build and deployment
 
@@ -61,5 +53,5 @@ to deploy:
 The private [UC3 RAMS infrastructure](https://github.com/CDLUC3/ngrams-infrastructure)
 provides the operational conventions. FAIR Station must not reuse its database,
 credentials, secret namespace, certificate, or service. Separate
-[git conventions](git_conventions.md) apply here because FAIR Station keeps
-parallel `development` and `main` histories.
+[git conventions](git_conventions.md) apply here because FAIR Station releases
+from a single `main` history with Release Please.

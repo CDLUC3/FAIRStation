@@ -51,11 +51,8 @@ def branch_ruleset(branch, merge_methods)
 end
 
 rulesets = [
-  # Features squash; a merge commit is allowed for syncing main back.
-  branch_ruleset("development", %w[squash merge]),
-  # Promotions and release PRs merge, never squash: the merge preserves the
-  # individual commits release-please reads.
-  branch_ruleset("main", %w[merge]),
+  # Release Please's own workflow uses squash merges; keep main linear.
+  branch_ruleset("main", %w[squash]),
   {
     name: "FAIR Station release tags", target: "tag", enforcement: "active",
     bypass_actors: [],
@@ -64,10 +61,9 @@ rulesets = [
   }
 ]
 settings = {
-  default_branch: "development", allow_merge_commit: true, allow_squash_merge: true,
+  default_branch: "main", allow_merge_commit: false, allow_squash_merge: true,
   allow_rebase_merge: false, allow_auto_merge: false, delete_branch_on_merge: false,
-  squash_merge_commit_title: "PR_TITLE", squash_merge_commit_message: "PR_BODY",
-  merge_commit_title: "PR_TITLE", merge_commit_message: "PR_BODY"
+  squash_merge_commit_title: "PR_TITLE", squash_merge_commit_message: "PR_BODY"
 }
 
 unless ARGV == [ "--apply" ]
@@ -77,17 +73,10 @@ end
 
 repository = github(API)
 abort "Repository admin permission is required; no settings changed." unless repository.dig("permissions", "admin")
-branches = github("#{API}/branches?per_page=100")
-unless branches.any? { |branch| branch.fetch("name") == "development" }
-  main = github("#{API}/git/ref/heads/main")
-  github("#{API}/git/refs", method: "POST", body: { ref: "refs/heads/development", sha: main.dig("object", "sha") })
-end
-# Both protected branches must already contain the checks this script requires.
-%w[development main].each do |branch|
-  workflow = github("#{API}/contents/.github/workflows/ci.yml?ref=#{branch}")
-  jobs = YAML.safe_load(Base64.decode64(workflow.fetch("content"))).fetch("jobs")
-  abort "#{branch} must contain the checks and policy CI jobs before protection is enabled." unless %w[checks policy].all? { |name| jobs.key?(name) }
-end
+# main must already contain the checks this script requires.
+workflow = github("#{API}/contents/.github/workflows/ci.yml?ref=main")
+jobs = YAML.safe_load(Base64.decode64(workflow.fetch("content"))).fetch("jobs")
+abort "main must contain the checks and policy CI jobs before protection is enabled." unless %w[checks policy].all? { |name| jobs.key?(name) }
 
 github(API, method: "PATCH", body: settings)
 existing_rules = github("#{API}/rulesets?includes_parents=false&per_page=100")
@@ -97,5 +86,5 @@ rulesets.each do |ruleset|
   path += "/#{existing.fetch('id')}" if existing
   github(path, method: existing ? "PUT" : "POST", body: ruleset)
 end
-puts "Configured development as default and protected both branches against force pushes, deletion, and untitled PRs."
+puts "Configured main as default and protected it against force pushes, deletion, and merge commits."
 puts "Add the RELEASE_PLEASE_TOKEN secret separately; no secrets were read or written."

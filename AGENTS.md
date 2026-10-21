@@ -17,7 +17,7 @@ Activate `.ruby-version` before running commands.
 ## Read when relevant
 
 - [README](README.md): prerequisites, setup, verification, and release workflow.
-- [Git conventions](docs/git_conventions.md): commit, branch, PR, and promotion rules.
+- [Git conventions](docs/git_conventions.md): commit, branch, PR, and release rules.
 - [GitHub setup](docs/github_setup.md): branch protections and the release token.
 - [Architecture decisions](docs/architecture_decisions.md): stack and deferred AWS work.
 - [Rails guidelines](docs/rails_guidelines.md): responsibilities, database changes, tests, authorization, and provenance.

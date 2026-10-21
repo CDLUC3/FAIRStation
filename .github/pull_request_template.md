@@ -1,7 +1,6 @@
 ## What
 
-<!-- The change, in a sentence or two. Link the issue. For a promotion, summarize
-the release; Release Please reads the merged commits. -->
+<!-- The change, in a sentence or two. Link the issue. -->
 
 ## Why
 
