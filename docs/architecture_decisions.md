@@ -51,8 +51,8 @@ to deploy:
   introducing a second deployment mechanism;
 - build one immutable image per release and deploy that same image, with database
   preparation before the web service starts;
-- keep application credentials in AWS, with GitHub-to-AWS access through OIDC
-  rather than stored access keys;
+- keep the Rails master key in AWS and pass it to the service, with
+  GitHub-to-AWS access through OIDC rather than stored access keys;
 - pin deployments to the released commit and image digest, not a mutable tag.
 
 ## Reference implementation
