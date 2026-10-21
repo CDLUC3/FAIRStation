@@ -116,6 +116,8 @@ RAMS availability, or readiness of future integrations.
   of spreading access across environment variables and provider-specific stores.
 - `RELEASE_PLEASE_TOKEN` is a GitHub Actions secret for release automation, not
   an application secret; it does not change the runtime master-key requirement.
+  Do not put it in Rails credentials: the release workflow must not receive the
+  production master key.
 - `.gitignore` excludes master/credential keys, `.env*`, local databases, logs,
   caches, and compiled assets. `.env` files are **not automatically loaded**.
   Filter sensitive parameters in `config/initializers/filter_parameter_logging.rb`.

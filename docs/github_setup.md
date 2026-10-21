@@ -38,7 +38,9 @@ one repository is enough:
 
 Do not use `GITHUB_TOKEN`: pull requests and releases it creates do not trigger
 other workflows. `RELEASE_PLEASE_TOKEN` is a CI secret, not an application
-secret; the app runtime still needs only `RAILS_MASTER_KEY`.
+secret; the app runtime still needs only `RAILS_MASTER_KEY`. Do not put it in
+Rails credentials: the release workflow must not receive the production master
+key.
 
 ## Routine release
 
