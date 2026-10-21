@@ -19,15 +19,16 @@ AWS deployment is not part of this setup yet. See #31 and
 
 - `development` default; features squash, and a merge commit is allowed for
   syncing `main` back.
-- `main`: squash only — never a merge commit. Both promotions and release PRs
-  squash.
+- `main`: merge only — never squash. Both promotions and release PRs merge.
 - `development` and `main`: no force push or deletion; PRs require the `checks`
   and `policy` jobs and resolved conversations. No configured bypass actors.
 - `v*` tags: creation allowed, update and deletion blocked.
 
 The `policy` job accepts `main` PRs only from this repository's `development`
-branch or `release-please--branches--main`. Every PR title, including promotions,
-must use the Conventional Commit format. Title edits rerun the check.
+branch or `release-please--branches--main`. Feature PR titles use the
+Conventional Commit format. Promotion PRs use `Release: <summary>`; release PRs
+use Release Please's generated `chore(main): release ...` title. Title edits
+rerun the check.
 
 ## Release token
 
@@ -48,10 +49,10 @@ other workflows.
 1. Squash feature PRs into `development`, titled in commit format.
 2. Merge `main` into `development` and push, so promotion does not revert release
    metadata.
-3. Open a `development` → `main` PR titled with what ships, for example
-   `feat(import): build a research activity from RAMS data`. Squash-merge it.
-4. Review Release Please's version/changelog PR against `main`; squash-merge it.
-   That publishes the release and tag.
+3. Open a `development` → `main` PR titled `Release: promote development to
+   main`. Merge it with a merge commit.
+4. Review Release Please's version/changelog PR against `main`; merge it with a
+   merge commit. That publishes the release and tag.
 5. Merge `main` into `development` again for the next cycle.
 
 To reconcile after a transient failure, without inventing a tag:

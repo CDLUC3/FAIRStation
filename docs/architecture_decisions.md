@@ -22,17 +22,22 @@ deferred; nothing here claims a deployed environment.
 
 - **`development` is the integration and default branch; `main` is released.**
   Feature PRs target `development`; promotions and release PRs target `main`.
-- **All PR titles use Conventional Commits.** Feature PRs squash, so the title
-  becomes the commit subject. Promotions and release PRs also squash: a merge
-  commit would replay already-released commits into Release Please's range and
-  duplicate changelog entries.
+- **Feature PR titles use Conventional Commits; promotion titles name the
+  release.** Feature PRs squash, so their titles become commit subjects.
+  Promotions merge, never squash: the merge preserves the individual commits
+  Release Please reads. Title promotions `Release: ...`; do not encode a single
+  feature or a version in the title.
+- **Do not mix merge and squash promotions.** A squashed promotion leaves its
+  original commits only on `development`, so a later merge replays them into
+  Release Please's range. This repository is pre-release, so it can adopt merge
+  promotions without inherited history.
 - **Merge `main` back into `development` before each promotion**, so the
   promotion diff does not revert `version.txt`, `CHANGELOG.md`, or the release
   manifest.
 - **Review Release Please's PR before it publishes.** Merging it creates the
   version tag and GitHub release. It is a human gate, not automatic publishing.
 - **Both long-lived branches require PRs and CI.** Protect against force pushes
-  and deletion; keep `main` squash-only. Details and setup live in
+  and deletion; keep `main` merge-only. Details and setup live in
   [GitHub setup](github_setup.md).
 - **Release metadata stays on `main`.** Do not cherry-pick or rewrite release
   history; sync `main` into `development` instead.

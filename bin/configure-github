@@ -53,8 +53,9 @@ end
 rulesets = [
   # Features squash; a merge commit is allowed for syncing main back.
   branch_ruleset("development", %w[squash merge]),
-  # Promotions and release PRs squash, never a merge commit.
-  branch_ruleset("main", %w[squash]),
+  # Promotions and release PRs merge, never squash: the merge preserves the
+  # individual commits release-please reads.
+  branch_ruleset("main", %w[merge]),
   {
     name: "FAIR Station release tags", target: "tag", enforcement: "active",
     bypass_actors: [],
