@@ -11,6 +11,13 @@ deferred; nothing here claims a deployed environment.
 - **SQLite for local development and tests.** It keeps setup self-contained. A
   deployed database choice is undecided; Docker, the production adapter, and the
   AWS environment are deferred until there is a model worth deploying (#30/#32).
+- **Rails encrypted credentials are the application secrets boundary.** Keep
+  `secret_key_base`, future RAMS/Zotero/ORCID credentials, and managed-database
+  credentials in `config/credentials.yml.enc` or environment-specific
+  credentials. The runtime deployment supplies only `RAILS_MASTER_KEY`; do not
+  spread application secrets across environment variables or provider-specific
+  stores. CI/tooling tokens such as `RELEASE_PLEASE_TOKEN` remain GitHub Actions
+  secrets, not application configuration.
 - **No background-job backend selected.** No jobs exist. Do not enqueue durable
   work with the in-process default; choose a persistent backend when the first
   import or discovery workflow needs one.

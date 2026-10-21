@@ -97,15 +97,25 @@ RAMS availability, or readiness of future integrations.
   Never configure a RAMS database connection; eventual RAMS access uses its API.
 - `.ruby-version` and `Gemfile.lock` pin the toolchain and dependencies.
   `config/environments/` holds environment-specific Rails settings.
-  `PORT`, `RAILS_MAX_THREADS`, and `RAILS_LOG_LEVEL` use the Rails/Puma conventions.
-- Supply secrets through the environment or Rails encrypted credentials. Production
-  requires a stable, private `SECRET_KEY_BASE`, or access to the encrypted
-  `secret_key_base` via its matching `RAILS_MASTER_KEY`. Use your deployment secret
-  store; never commit keys or put real secrets in example commands.
-- `config/credentials.yml.enc` is the generated encrypted credentials file.
-  Only edit it with an authorized matching key and `bin/rails credentials:edit`.
-  If no shared key exists, coordinate credential provisioning before using it;
+  `PORT`, `RAILS_MAX_THREADS`, `RAILS_LOG_LEVEL`, and
+  `FAIR_STATION_DATABASE_PATH` are non-secret operational settings.
+- **Application secrets live in Rails encrypted credentials.**
+  `config/credentials.yml.enc` already contains `secret_key_base`; production
+  reads it using `RAILS_MASTER_KEY`. The deployment therefore supplies only the
+  master key (set `RAILS_MASTER_KEY`, or mount `config/master.key` read-only).
+  Do not add `SECRET_KEY_BASE` or integration keys as separate environment
+  variables.
+- Edit shared credentials with `bin/rails credentials:edit`, or production-only
+  credentials with `bin/rails credentials:edit --environment production`. Commit
+  the `.enc` files; never commit `config/master.key` or
+  `config/credentials/*.key`. If no shared key exists, coordinate provisioning;
   do not silently replace shared credentials.
+- Future RAMS, Zotero, ORCID, and managed-database credentials belong in the same
+  encrypted store under namespaced keys, read with
+  `Rails.application.credentials.dig(...)`. This keeps one runtime secret instead
+  of spreading access across environment variables and provider-specific stores.
+- `RELEASE_PLEASE_TOKEN` is a GitHub Actions secret for release automation, not
+  an application secret; it does not change the runtime master-key requirement.
 - `.gitignore` excludes master/credential keys, `.env*`, local databases, logs,
   caches, and compiled assets. `.env` files are **not automatically loaded**.
   Filter sensitive parameters in `config/initializers/filter_parameter_logging.rb`.
