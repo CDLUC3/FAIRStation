@@ -61,3 +61,9 @@ gh workflow run release-please.yml --ref main
 If Release Please's PR conflicts on release files, resolve the conflict on its
 branch and prove the resulting tree matches `main` plus the version and changelog
 changes; see [git conventions](git_conventions.md).
+
+### Hotfixes
+
+A hotfix follows the same path; there is no separate emergency deploy. Open a
+`fix:` PR against `main`, squash-merge it, then squash-merge the release PR it
+updates and deploy that release.
