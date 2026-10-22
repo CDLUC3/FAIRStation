@@ -36,6 +36,10 @@ one repository is enough:
 3. Keep the expiry visible. When it lapses, release PRs stop opening until it is
    replaced.
 
+The current `RELEASE_PLEASE_TOKEN` was created on 2026-10-21 with a 366-day
+expiry, so it expires on **2027-10-22**. Update this note whenever the token is
+rotated.
+
 Do not use `GITHUB_TOKEN`: pull requests and releases it creates do not trigger
 other workflows. `RELEASE_PLEASE_TOKEN` is a CI secret, not an application
 secret; the app runtime still needs only `RAILS_MASTER_KEY`. Do not put it in
