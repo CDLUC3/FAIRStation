@@ -57,8 +57,10 @@ neither is selected by the existing exploratory schema/context documents.
   Do not assume RAMS permissions transfer automatically to FAIR Station.
 - Keep CSRF protection, parameterized queries, strong parameters, and default HTML
   escaping. Validate redirects and filter credentials and sensitive metadata from logs.
-- Keep secrets out of source, fixtures, screenshots, and logs. Configuration and
-  credential handling are documented in the [README](../README.md#configuration-and-secrets).
+- Keep application secrets in Rails encrypted credentials, not in source,
+  fixtures, screenshots, logs, or a second deployment mechanism. The runtime
+  deployment supplies only `RAILS_MASTER_KEY`; see the
+  [README](../README.md#configuration-and-secrets).
 
 ## External-source provenance
 

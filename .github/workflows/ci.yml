@@ -2,21 +2,41 @@ name: CI
 
 on:
   pull_request:
+    types: [opened, synchronize, reopened, edited, ready_for_review]
   push:
-    branches: [ main ]
+    branches: [main]
 
 permissions:
   contents: read
 
 jobs:
+  policy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check pull request policy
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
+        with:
+          script: |
+            const pr = context.payload.pull_request;
+            if (pr.base.ref !== 'main') {
+              core.setFailed('Pull requests must target main.');
+              return;
+            }
+            if (!/^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\([^)]+\))?!?: \S[^\r\n]*$/.test(pr.title)) {
+              core.setFailed('Use a Conventional Commit PR title, for example: feat: add dataset search.');
+              return;
+            }
+            core.notice('Squash and merge.');
+
   checks:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
 
       - name: Set up Ruby
-        uses: ruby/setup-ruby@v1
+        uses: ruby/setup-ruby@824c0e29fdfc7d689c191c27acc969d2d04b7dd8 # v1
         with:
           bundler-cache: true
 

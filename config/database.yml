@@ -23,4 +23,6 @@ test:
 # ensure the database is located in a persisted volume.
 production:
   <<: *default
+  # A managed database's URL or password belongs in Rails credentials, not a
+  # separate deployment environment variable.
   database: <%= ENV.fetch("FAIR_STATION_DATABASE_PATH", "storage/production.sqlite3") %>
