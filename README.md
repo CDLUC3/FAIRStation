@@ -15,9 +15,10 @@ liveness check at `/up`. Research review, source integrations, and sign-in are
 not implemented; the research model and identity provider remain undecided.
 
 The stack is Ruby **4.0.6**, Rails **8.1.4** (locked in `Gemfile.lock`), Puma,
-SQLite, ERB, Hotwire (Turbo and Stimulus), importmap, and Propshaft. SQLite keeps
-the bootstrap self-contained; no database server, Node, Redis, or RAMS access is
-needed.
+MySQL **8.4**, ERB, Hotwire (Turbo and Stimulus), importmap, and Propshaft. MySQL
+runs in every environment — the same engine as the deployed RDS instance — so SQL
+differences surface locally instead of in staging. Docker supplies the local
+server; no Node, Redis, or RAMS access is needed.
 
 ## Local setup
 
@@ -35,15 +36,18 @@ needed.
    If a shell selects system Ruby, activate your Ruby manager first; with mise,
    prefix commands with `mise exec ruby@4.0.6 --`.
 
-2. Install dependencies and prepare FAIR Station's local databases:
+2. Install dependencies, start MySQL, and prepare FAIR Station's local databases:
 
    ```sh
    bin/setup --skip-server
    ```
 
-   This runs Bundler and `bin/rails db:prepare`. It does not reset existing data.
-   No master key or external credentials are required for development or tests.
-   Keep `DATABASE_URL` unset so Rails uses the dedicated local configuration.
+   This runs Bundler, starts the MySQL server defined in `compose.yml` (or uses a
+   server already listening on the configured host and port), and runs
+   `bin/rails db:prepare`. It does not reset existing data. No master key or
+   external credentials are required for development or tests. Docker must be
+   running for the default setup; set `DATABASE_HOST`, `DATABASE_PORT`,
+   `DATABASE_USERNAME`, and `DATABASE_PASSWORD` to use a different server.
 
 3. Start the app:
 
@@ -92,13 +96,18 @@ RAMS availability, or readiness of future integrations.
 
 ## Configuration and secrets
 
-- `config/database.yml` defines separate SQLite files under `storage/` for
-  development, test, and production. They belong exclusively to FAIR Station.
-  Never configure a RAMS database connection; eventual RAMS access uses its API.
+- `config/database.yml` defines separate MySQL databases
+  (`fair_station_development`, `fair_station_test`) that belong exclusively to
+  FAIR Station. Never configure a RAMS database connection; eventual RAMS access
+  uses its API. Development and test read non-secret coordinates from the
+  environment; production reads its password from Rails credentials, never from
+  an environment variable.
 - `.ruby-version` and `Gemfile.lock` pin the toolchain and dependencies.
   `config/environments/` holds environment-specific Rails settings.
-  `PORT`, `RAILS_MAX_THREADS`, `RAILS_LOG_LEVEL`, and
-  `FAIR_STATION_DATABASE_PATH` are non-secret operational settings.
+  `PORT`, `RAILS_MAX_THREADS`, `RAILS_LOG_LEVEL`, and the non-secret database
+  coordinates `DATABASE_HOST`, `DATABASE_PORT`, `DATABASE_NAME`, and
+  `DATABASE_USERNAME` are non-secret operational settings; the deployed contract
+  is [runtime parameters](docs/runtime_parameters.md).
 - **Application secrets live in Rails encrypted credentials.**
   `config/credentials.yml.enc` already contains `secret_key_base`; production
   reads it using `RAILS_MASTER_KEY`. The deployment therefore supplies only the

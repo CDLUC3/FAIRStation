@@ -8,9 +8,12 @@ deferred; nothing here claims a deployed environment.
 
 - **Ruby 4.0.6, Rails 8.1, server-rendered ERB, Hotwire, importmap, Propshaft.**
   Keep one Rails application; no separate frontend build or runtime.
-- **SQLite for local development and tests.** It keeps setup self-contained. A
-  deployed database choice is undecided; Docker, the production adapter, and the
-  AWS environment are deferred until there is a model worth deploying (#30/#32).
+- **MySQL 8.4 in every environment.** Development, test, CI, and the deployed
+  RDS instance run the same engine, so SQL mode, collation, and column behavior
+  match; a SQLite/MySQL split hides deployment-only failures. Local development
+  runs MySQL from `compose.yml`, and `bin/setup` starts it. The deployed
+  environment itself remains deferred until there is a model worth deploying
+  (#30/#32).
 - **Rails encrypted credentials are the application secrets boundary.** Keep
   `secret_key_base`, future RAMS/Zotero/ORCID credentials, and managed-database
   credentials in `config/credentials.yml.enc` or environment-specific
@@ -43,9 +46,9 @@ deferred; nothing here claims a deployed environment.
 
 ## Deferred: build and deployment
 
-A production container, a managed database, and the AWS staging pipeline were
-developed separately and are not part of this change. When a release first needs
-to deploy:
+The production container is defined by `Dockerfile` and `bin/docker-entrypoint`;
+nothing here claims a deployed environment. The managed database, the AWS
+staging pipeline, and DNS remain deferred. When a release first needs to deploy:
 
 - follow the UC3 CodePipeline → CodeBuild → ECR → ECS Fargate pattern rather than
   introducing a second deployment mechanism;

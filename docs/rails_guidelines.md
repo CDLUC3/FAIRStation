@@ -21,9 +21,10 @@ neither is selected by the existing exploratory schema/context documents.
 
 ## Database changes
 
-- FAIR Station owns separate development, test, and production SQLite databases.
+- FAIR Station owns separate development, test, and production MySQL databases.
   RAMS access must eventually use its API, never its database or credentials.
-  Keep `DATABASE_URL` unset for the default local setup.
+  Local development uses the same engine version as deployment, started by
+  `bin/setup` from `compose.yml`. `database.yml` does not read `DATABASE_URL`.
 - Generate migrations with `bin/rails generate migration`; commit migrations and
   the generated `db/schema.rb` once there is a schema. Do not hand-edit schema dumps
   or translate the exploratory `SCHEMA.md` into tables without an approved requirement.
@@ -31,8 +32,9 @@ neither is selected by the existing exploratory schema/context documents.
   Use transactions with bang writes or explicit failure handling for atomic changes.
 - Review migrations for existing data, locking, and recoverability. Do not rewrite
   migrations already deployed; destructive changes require an explicit rollout plan.
-- Paginate growing lists and avoid N+1 queries. SQLite production needs persistent
-  storage and backups; changing database engines is an explicit infrastructure decision.
+- Paginate growing lists and avoid N+1 queries. MySQL runs the same version in
+  development and deployment, so migrations must be valid against RDS; changing
+  engines is an explicit infrastructure decision.
 
 ## Tests and verification
 
@@ -78,7 +80,7 @@ neither is selected by the existing exploratory schema/context documents.
 ## References
 
 Adapted from [RAMS Rails guidelines](https://github.com/UCNRS-RAMS/ucnrs-rams/blob/main/docs/rails_guidelines.md).
-FAIR Station uses Minitest and SQLite, not RAMS's RSpec/factory and MySQL conventions;
+FAIR Station uses Minitest and MySQL, not RAMS's RSpec/factory conventions;
 RAMS-specific roles, existing presenters, and authentication choices are not inherited.
 The concise [AGENTS.md](../AGENTS.md) follows the progressive-disclosure approach in
 [Writing a Good AGENTS.md](https://www.philschmid.de/writing-good-agents).

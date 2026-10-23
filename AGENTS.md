@@ -4,7 +4,7 @@ FAIR Station helps reserve managers connect research context and candidate outpu
 
 ## Stack and commands
 
-Ruby 4.0.6; Rails 8.1; SQLite owned by FAIR Station; server-rendered ERB;
+Ruby 4.0.6; Rails 8.1; MySQL 8.4 owned by FAIR Station; server-rendered ERB;
 Hotwire (Turbo/Stimulus), importmap, and Propshaft. No Node build step.
 Activate `.ruby-version` before running commands.
 
