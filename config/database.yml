@@ -6,7 +6,7 @@
 #
 # Deployment supplies the non-secret coordinates below and RAILS_MASTER_KEY.
 # The database password lives in Rails encrypted credentials, not in an
-# environment variable; see docs/runtime_parameters.md.
+# environment variable.
 default: &default
   adapter: mysql2
   encoding: utf8mb4

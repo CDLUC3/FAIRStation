@@ -106,8 +106,7 @@ RAMS availability, or readiness of future integrations.
   `config/environments/` holds environment-specific Rails settings.
   `PORT`, `RAILS_MAX_THREADS`, `RAILS_LOG_LEVEL`, and the non-secret database
   coordinates `DATABASE_HOST`, `DATABASE_PORT`, `DATABASE_NAME`, and
-  `DATABASE_USERNAME` are non-secret operational settings; the deployed contract
-  is [runtime parameters](docs/runtime_parameters.md).
+  `DATABASE_USERNAME` are non-secret operational settings.
 - **Application secrets live in Rails encrypted credentials.**
   `config/credentials.yml.enc` already contains `secret_key_base`; production
   reads it using `RAILS_MASTER_KEY`. The deployment therefore supplies only the

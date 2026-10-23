@@ -47,9 +47,8 @@ already in the required format. Review it like any other PR.
 
 After releasable PRs land on `main`, Release Please opens or updates a release PR
 against `main`. Review the version and changelog, then squash-merge it. That
-publishes the GitHub release and tag. The tag is the deployment gate: the
-staging pipeline triggers on `v*` tags through its GitHub connection, so only a
-merged release PR can start a deployment.
+publishes the GitHub release and tag. A deployment workflow may trigger on the
+published release; until one exists, publishing a release changes no runtime.
 
 ## Rules
 

@@ -54,14 +54,12 @@ staging pipeline, and DNS remain deferred. When a release first needs to deploy:
   introducing a second deployment mechanism;
 - build one immutable image per release and deploy that same image, with database
   preparation before the web service starts;
-- trigger the staging pipeline from the `v*` release tag only, through the
-  CodeConnections GitHub app. A merged release PR creates that tag, so the tag
-  is the deployment gate; branch pushes never deploy, and there is no GitHub
-  Actions deploy step;
-- keep the Rails master key in AWS and pass it to the service. AWS pulls source
-  itself, so GitHub needs no AWS credentials and no OIDC role;
-- pin deployments to the released commit and image digest. The tag trigger
-  clones the tagged commit, which is immutable by construction.
+- let AWS pull source through a CodeConnections GitHub app and start the pipeline
+  from the `v*` release tag, so the tag is the deployment gate and GitHub needs
+  no AWS credentials;
+- keep `RAILS_MASTER_KEY` the only secret the service receives. Application
+  secrets, including the database password and later RAMS and Zotero keys, stay
+  in Rails encrypted credentials.
 
 ## Reference implementation
 
