@@ -73,4 +73,4 @@ database password directly; it decrypts credentials like the web task does.
 
 An AWS operator with account access creates the parameters once per environment.
 They are never written by CI, never committed, and never printed by the
-deployment workflow.
+deployment pipeline.

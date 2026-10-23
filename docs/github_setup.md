@@ -51,6 +51,10 @@ key.
 1. Squash feature PRs into `main`, titled in commit format.
 2. Review Release Please's version/changelog PR against `main`; squash-merge it.
    That publishes the release and tag.
+3. Publishing the release creates the `v*` tag, which starts the staging
+   pipeline. The pipeline triggers on tag pushes only, so branch pushes and
+   feature PRs never deploy. There is no GitHub Actions deploy step. Recovery
+   after a failed run is a manual pipeline start pinned to that tag's commit.
 
 To reconcile after a transient failure, without inventing a tag:
 
