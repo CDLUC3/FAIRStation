@@ -1,28 +1,33 @@
 # FAIR Station owns these databases. Never point them at RAMS.
+#
+# One engine everywhere: development, test, CI, and the deployed RDS instance
+# all run MySQL 8.4. Local development uses the server defined in compose.yml,
+# so SQL mode, collation, and column behavior match deployment.
+#
+# Deployment supplies the non-secret coordinates below and RAILS_MASTER_KEY.
+# The database password lives in Rails encrypted credentials, not in an
+# environment variable.
 default: &default
-  adapter: sqlite3
+  adapter: mysql2
+  encoding: utf8mb4
   max_connections: <%= ENV.fetch("RAILS_MAX_THREADS") { 5 } %>
-  timeout: 5000
+  host: <%= ENV.fetch("DATABASE_HOST", "127.0.0.1") %>
+  port: <%= ENV.fetch("DATABASE_PORT", "3306") %>
+  username: <%= ENV.fetch("DATABASE_USERNAME", "root") %>
+  password: <%= ENV.fetch("DATABASE_PASSWORD") { "root" } %>
 
 development:
   <<: *default
-  database: storage/development.sqlite3
+  database: fair_station_development
 
 # Warning: The database defined as "test" will be erased and
 # re-generated from your development database when you run "rake".
 # Do not set this db to the same as development or production.
 test:
   <<: *default
-  database: storage/test.sqlite3
+  database: fair_station_test
 
-# SQLite3 write its data on the local filesystem, as such it requires
-# persistent disks. If you are deploying to a managed service, you should
-# make sure it provides disk persistence, as many don't.
-#
-# Similarly, if you deploy your application as a Docker container, you must
-# ensure the database is located in a persisted volume.
 production:
   <<: *default
-  # A managed database's URL or password belongs in Rails credentials, not a
-  # separate deployment environment variable.
-  database: <%= ENV.fetch("FAIR_STATION_DATABASE_PATH", "storage/production.sqlite3") %>
+  database: <%= ENV.fetch("DATABASE_NAME", "fair_station") %>
+  password: <%= Rails.application.credentials.dig(:database, :password) %>

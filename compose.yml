@@ -1,0 +1,25 @@
+# Local MySQL, matching the RDS engine version used in deployment.
+#
+#   docker compose up -d --wait db
+#
+# Settings here are development-only: the server listens on loopback and the
+# credentials are throwaway. Never reuse this file for a deployed environment.
+services:
+  db:
+    image: mysql:8.4
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_0900_ai_ci
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: fair_station_development
+    ports:
+      - "127.0.0.1:3306:3306"
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "--host=127.0.0.1", "--user=root", "--password=root"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    volumes:
+      - mysql-data:/var/lib/mysql
+
+volumes:
+  mysql-data:
