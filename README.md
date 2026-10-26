@@ -110,6 +110,13 @@ RAMS availability, or readiness of future integrations.
   the `.enc` files; never commit `config/master.key` or
   `config/credentials/*.key`. If no shared key exists, coordinate provisioning;
   do not silently replace shared credentials.
+- **Error reporting is Honeybadger**, configured in `config/honeybadger.yml`. Its
+  API key is an application secret: it is stored in Rails encrypted credentials
+  as `honeybadger_api_key`, not in an environment variable. Development and test
+  use Honeybadger's null backend, so no report leaves a local process. If the key
+  is absent, production logs `API key is missing` and drops notices instead of
+  failing a request. Insights performance events are disabled; only exceptions
+  from deployed environments are reported.
 - Future RAMS, Zotero, ORCID, and managed-database credentials belong in the same
   encrypted store under namespaced keys, read with
   `Rails.application.credentials.dig(...)`. This keeps one runtime secret instead
