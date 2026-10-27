@@ -21,6 +21,11 @@ deferred; nothing here claims a deployed environment.
   spread application secrets across environment variables or provider-specific
   stores. CI/tooling tokens such as `RELEASE_PLEASE_TOKEN` remain GitHub Actions
   secrets, not application configuration.
+- **Honeybadger is the error-reporting service.** Exceptions from deployed
+  environments are reported; development and test use its null backend.
+  `config/honeybadger.yml` reads the API key from Rails encrypted credentials
+  (`honeybadger_api_key`), consistent with the secrets boundary above, and
+  Insights performance events stay disabled.
 - **No background-job backend selected.** No jobs exist. Do not enqueue durable
   work with the in-process default; choose a persistent backend when the first
   import or discovery workflow needs one.

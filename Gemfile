@@ -3,6 +3,8 @@ source "https://rubygems.org"
 ruby file: ".ruby-version"
 
 gem "rails", "~> 8.1.4"
+# Error reporting for deployed environments [https://docs.honeybadger.io/lib/ruby/]
+gem "honeybadger"
 # The modern asset pipeline for Rails [https://github.com/rails/propshaft]
 gem "propshaft"
 # MySQL in every environment. Local development, CI, and the deployed RDS
