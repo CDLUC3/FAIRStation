@@ -1,10 +1,23 @@
 #!/usr/bin/env ruby
 require "fileutils"
+require "socket"
 
 APP_ROOT = File.expand_path("..", __dir__)
+DATABASE_HOST = ENV.fetch("DATABASE_HOST", "127.0.0.1")
+DATABASE_PORT = Integer(ENV.fetch("DATABASE_PORT", "3306"))
 
 def system!(*args)
   system(*args, exception: true)
+end
+
+def database_ready?(retries: 1)
+  retries.times do |attempt|
+    TCPSocket.new(DATABASE_HOST, DATABASE_PORT).close
+    return true
+  rescue SystemCallError
+    sleep 1 unless attempt == retries - 1
+  end
+  false
 end
 
 FileUtils.chdir APP_ROOT do
@@ -14,6 +27,14 @@ FileUtils.chdir APP_ROOT do
 
   puts "== Installing dependencies =="
   system("bundle check") || system!("bundle install")
+
+  puts "\n== Starting MySQL =="
+  if database_ready?(retries: 30)
+    puts "MySQL already accepting connections on #{DATABASE_HOST}:#{DATABASE_PORT}"
+  else
+    system! "docker compose up -d --wait db"
+    abort "MySQL did not accept connections on #{DATABASE_HOST}:#{DATABASE_PORT}" unless database_ready?(retries: 30)
+  end
 
   puts "\n== Preparing database =="
   system! "bin/rails db:prepare"
