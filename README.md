@@ -14,7 +14,7 @@ The application currently serves a public landing page at `/` and a deployment
 liveness check at `/up`. Research review, source integrations, and sign-in are
 not implemented; the research model and identity provider remain undecided.
 
-The stack is Ruby **4.0.6**, Rails **8.1.4** (locked in `Gemfile.lock`), Puma,
+The stack is Ruby **4.0.6**, Rails **8.1.4.1** (locked in `Gemfile.lock`), Puma,
 MySQL **8.4**, ERB, Hotwire (Turbo and Stimulus), importmap, and Propshaft. MySQL
 runs in every environment — the same engine as the deployed RDS instance — so SQL
 differences surface locally instead of in staging. Docker supplies the local
