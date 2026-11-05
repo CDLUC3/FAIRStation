@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "name": "fair-station",
+  "scope": "fair-station",
+  "repo": "/sources/repo",
+  "docs": [
+    "README.md",
+    "AGENTS.md",
+    "docs/**/*.md",
+    "db/schema.rb",
+    "config/routes.rb",
+    "config/deploy.yml"
+  ],
+  "sessions": {
+    "-code-w-FAIRStation": "fair-station"
+  },
+  "app_db": "/sources/repo/storage/development.sqlite3",
+  "git": true,
+  "git_limit": 800
+}
