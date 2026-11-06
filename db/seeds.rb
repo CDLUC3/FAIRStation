@@ -11,5 +11,5 @@
 Station.transaction do
   station = Station.find_or_initialize_by(name: "Quail Ridge Reserve")
   station.update!(doi: "10.21973/N30T0K", latitude: "38.48277778", longitude: "-122.14944444", ror_id: nil)
-  station.source_identifiers.find_or_create_by!(source_system: "rams", external_id: "27")
+  station.source_identifiers.find_or_create_by!(source_system: "rams", source_instance: "ucnature", external_id: "27")
 end

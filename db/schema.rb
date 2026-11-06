@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_11_05_152111) do
+ActiveRecord::Schema[8.1].define(version: 2026_11_06_185013) do
   create_table "source_identifiers", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
     t.string "record_type", null: false
     t.bigint "record_id", null: false
@@ -18,8 +18,9 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_05_152111) do
     t.string "external_id", null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.string "source_instance", null: false
     t.index ["record_type", "record_id"], name: "index_source_identifiers_on_record"
-    t.index ["source_system", "external_id"], name: "index_source_identifiers_on_source_system_and_external_id", unique: true
+    t.index ["source_system", "source_instance", "external_id"], name: "index_source_identifiers_on_source_identity", unique: true
   end
 
   create_table "stations", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
