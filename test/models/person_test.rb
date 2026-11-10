@@ -1,11 +1,25 @@
 require "test_helper"
 
 class PersonTest < ActiveSupport::TestCase
-  test "requires a name and an ORCID" do
+  test "requires a name" do
     person = Person.new
     assert_not person.valid?
     assert_includes person.errors[:name], "can't be blank"
-    assert_includes person.errors[:orcid], "can't be blank"
+  end
+
+  test "people without ORCIDs remain distinct and can join an activity" do
+    first = Person.create!(name: "Researcher")
+    second = Person.create!(name: "Researcher", orcid: "  ")
+    assert_nil first.reload.orcid
+    assert_nil second.reload.orcid
+    assert_not_equal first.id, second.id
+
+    activity = ResearchActivity.create!(stations: [ Station.create!(name: "Quail Ridge") ])
+    [ first, second ].each do |person|
+      activity.activity_people.create!(person: person)
+      person.source_identifiers.create!(source_system: "rams", source_instance: "ucnature", external_id: person.id.to_s)
+    end
+    assert_equal [ first, second ], activity.people.order(:id).to_a
   end
 
   test "normalizes ORCID URLs and rejects duplicate identities" do

@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_11_09_161315) do
+ActiveRecord::Schema[8.1].define(version: 2026_11_10_185543) do
   create_table "activity_people", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
     t.bigint "research_activity_id", null: false
     t.bigint "person_id", null: false
@@ -35,7 +35,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_09_161315) do
   end
 
   create_table "people", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
-    t.string "orcid", null: false
+    t.string "orcid"
     t.string "name", null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
@@ -64,13 +64,13 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_09_161315) do
   create_table "source_identifiers", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
     t.string "record_type", null: false
     t.bigint "record_id", null: false
-    t.string "source_system", null: false
+    t.string "source_system", limit: 128, null: false
     t.string "external_id", null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
-    t.string "source_instance", null: false
+    t.string "source_instance", limit: 128, null: false
     t.index ["record_type", "record_id"], name: "index_source_identifiers_on_record"
-    t.index ["source_system", "source_instance", "external_id"], name: "index_source_identifiers_on_source_identity", unique: true
+    t.index ["source_system", "source_instance", "record_type", "external_id"], name: "index_source_identifiers_on_source_identity", unique: true
   end
 
   create_table "stations", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|

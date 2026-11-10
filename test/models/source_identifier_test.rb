@@ -41,6 +41,28 @@ class SourceIdentifierTest < ActiveSupport::TestCase
     assert_equal other_station, identifier.reload.record
   end
 
+  test "allows a person and activity to share a source id without confusing lookups" do
+    person = Person.create!(name: "Researcher")
+    activity = ResearchActivity.create!(stations: [ @station ])
+    source = { source_system: "rams", source_instance: "ucnature", external_id: "27" }
+    [ person, activity ].each { |record| record.source_identifiers.create!(source) }
+
+    assert_equal person, SourceIdentifier.find_by!(**source, record_type: "Person").record
+    assert_equal activity, SourceIdentifier.find_by!(**source, record_type: "ResearchActivity").record
+    duplicate = activity.source_identifiers.build(source)
+    assert_not duplicate.valid?
+    assert_raises(ActiveRecord::RecordNotUnique) do
+      SourceIdentifier.insert_all!([ source.merge(record_type: "Person", record_id: person.id) ])
+    end
+  end
+
+  test "validates source namespace lengths to match database limits" do
+    identifier = @station.source_identifiers.build(source_system: "s" * 129, source_instance: "i" * 129, external_id: "27")
+    assert_not identifier.valid?
+    assert identifier.errors[:source_system].any?
+    assert identifier.errors[:source_instance].any?
+  end
+
   test "enforces external id uniqueness in the database" do
     SourceIdentifier.create!(record: @station, source_system: "rams", source_instance: "ucnature", external_id: "17")
 
