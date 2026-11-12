@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.1.0](https://github.com/CDLUC3/FAIRStation/compare/v1.0.0...v1.1.0) (2026-11-12)
+
+
+### Features
+
+* add ResearchActivity, Person, and ActivityPerson models ([#69](https://github.com/CDLUC3/FAIRStation/issues/69)) ([e85bce6](https://github.com/CDLUC3/FAIRStation/commit/e85bce6e4d36ac6c91e28e62aabfcb51030b7124))
+* add Station model and Quail Ridge seed ([#66](https://github.com/CDLUC3/FAIRStation/issues/66)) ([47d0ad8](https://github.com/CDLUC3/FAIRStation/commit/47d0ad895ad8fc111a4e486426197e8516fcab7b))
+
 ## 1.0.0 (2026-11-05)
 
 
