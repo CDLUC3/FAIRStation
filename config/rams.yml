@@ -1,0 +1,27 @@
+shared:
+  base_url: https://rams.ucnature.org/api/v1/
+  reserve_id: 27
+  reserve_name: Quail Ridge Reserve
+  source:
+    source_system: rams
+    source_instance: ucnature
+  project_fields:
+    title: title
+    abstract: description
+    project_type: activity_type
+    status: status
+    start_date: start_date
+    end_date: end_date
+    discipline: discipline
+    discipline_other: discipline_other
+    keywords: keywords
+    taxonomic_keywords: taxonomic_keywords
+    thesis_title: thesis_title
+    course_title: course_title
+    course_number: course_number
+    submitted_at: submitted_at
+  station_fields: [name, short_name, description, doi, latitude, longitude]
+  imported_paths:
+    reserves: [id]
+    projects: [id, reserve.id, owner.id, owner.full_name, owner.orcid, applicant.id, applicant.full_name, applicant.orcid]
+    team_memberships: [id, project.id, user.id, user.full_name, user.orcid, user_role, active, is_principal_investigator]
