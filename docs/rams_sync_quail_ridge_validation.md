@@ -1,10 +1,10 @@
 # Quail Ridge production sync validation — 2026-11-12
 
-Evidence retrieved: `2026-11-13T01:04:52Z`. Source: `https://rams.ucnature.org/api/v1/`; reserve 27; source namespace `rams/ucnature`. This was a local FAIR Station development run. RAMS production was read-only. No merge or deployment occurred.
+Evidence retrieved: `2026-11-13T01:26:18Z`. Source: `https://rams.ucnature.org/api/v1/`; reserve 27; source namespace `rams/ucnature`. This was a local FAIR Station development run. RAMS production was read-only. No merge or deployment occurred.
 
 ## Result
 
-The full import and repeat run succeeded. All collection totals matched RAMS. Eight live detail responses (reverified at `2026-11-13T01:08:46Z`) matched their collection snapshots; all mapped fields in those samples matched local records. No sample shortfall.
+The full import and repeat run succeeded. All collection totals matched RAMS. Eight live detail responses (reverified at `2026-11-13T01:26:18Z`) matched their collection snapshots; all mapped fields in those samples matched local records. No sample shortfall.
 
 | Resource | Pulled | RAMS total |
 | --- | ---: | ---: |
@@ -78,7 +78,7 @@ Current: status=open and end_date absent or >= 2026-11-13. Historical: status=cl
 
 `id` checks the typed SourceIdentifier; `reserve` checks ActivityStation. Owner/applicant passes mean person identity presence only; the relationships are dropped. `created_at`, `updated_at` and type envelopes are not copied into activity attributes. All 14 mapped activity fields were compared, including null values and normalized timestamp formatting. All 32 nested name/ORCID assertions also matched their local People (ORCIDs normalized by the Person model).
 
-The complete source/stored values and API snapshot are local-only at `tmp/rams-sync/20261113T010847977210Z.json`. This checked-in report omits person names and ORCIDs.
+The complete source/stored values and API snapshot are local-only at `tmp/rams-sync/run-20261112-12224-qr6mqz/report.json`. This checked-in report omits person names and ORCIDs.
 
 ## Dropped-fields inventory
 
@@ -249,4 +249,20 @@ Every observed leaf path not imported into the domain graph is listed below, inc
 
 ## Verification
 
-`bin/ci` passed with Ruby 4.0.6: 39 tests, 188 assertions; RuboCop, dependency audits, Brakeman and Zeitwerk all passed. Tests use synthetic data and HTTP-boundary doubles, never RAMS production. The live repeat run preserved counts for Station, ResearchActivity, Person, ActivityPerson, ActivityStation and SourceIdentifier.
+`bin/ci` passed with Ruby 4.0.6: 49 tests, 231 assertions; RuboCop, dependency audits, Brakeman and Zeitwerk all passed. Tests use synthetic data and HTTP-boundary doubles, never RAMS production. The live repeat run preserved counts for Station, ResearchActivity, Person, ActivityPerson, ActivityStation and SourceIdentifier.
+
+## Review follow-up validation
+
+The refactored task was re-run against production after moving settings and the
+field crosswalk into `config/rams.yml`. Collection totals, dropped-field counts,
+eight project checks and all 32 nested person comparisons were verified again.
+All six local model counts remained unchanged. This full rerun issued eight
+uncached SELECTs; source identities and ORCID matches are loaded in batches.
+
+Regression coverage now includes consistent shared-membership role updates,
+conflicting incoming memberships, contradictory ORCID assertions, snapshot/report
+write failures, evidence file permissions, HTTP reads before the transaction,
+and bounded SELECT counts as the number of projects grows. Persisted values are
+re-read in batches for report comparisons. Source snapshots are staged before
+import and the report is flushed and synced before commit, so evidence-write
+failures prevent the database import from committing.

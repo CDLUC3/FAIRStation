@@ -23,7 +23,9 @@ bin/rails db:prepare
 bin/rails rams:sync_quail_ridge
 ```
 
-The production base URL is fixed to `https://rams.ucnature.org/api/v1/`.
+Non-secret settings and the field crosswalk live in `config/rams.yml`, loaded
+through `Rams::Configuration`. This test configuration pins Quail Ridge and
+the production base URL, `https://rams.ucnature.org/api/v1/`.
 There is no environment fallback. An empty project collection stops the run.
 All collection requests use `per_page=100` and follow RAMS pagination metadata.
 No endpoint receives `updated_since`. Retrieval order is reserves, projects,
@@ -41,11 +43,15 @@ spot-check records are detected, but equal-count changes elsewhere may escape.
 
 The importer fetches and checks all collections before writing. Station,
 research activity, person and membership writes share one transaction. Validation
-failure rolls them back. The validation detail requests also happen within this
-transaction; network timeouts are bounded. After commit, the task writes a
-mode-0600 JSON report and source snapshot under ignored `tmp/rams-sync/`.
-If writing the file fails, the database import has already committed; rerunning
-is safe. The snapshot contains operational research/person data; keep it local.
+failure rolls them back. All collection and validation detail requests finish
+before the transaction opens. A mode-0600 source snapshot is staged first under
+`tmp/rams-sync/run-*/snapshot.json` in a mode-0700 run directory. The validation
+report (`report.json`) includes both evidence paths, typed source assertions,
+and retrieval time. It is flushed and synced before the database commit. A
+snapshot or report write failure leaves the database unchanged; failed-run
+evidence is removed. A process crash can leave an orphan evidence directory,
+so a file alone is not proof that the database transaction committed. The
+snapshot contains operational research/person data; keep it local.
 
 Source identities use `source_system=rams`, `source_instance=ucnature`, and
 `record_type` in every lookup. Reserve IDs identify Stations, project IDs identify
@@ -61,7 +67,12 @@ Roles, active flags and PI assertions come only from team memberships. Owner and
 applicant stubs create or identify People but their relationships are not modeled.
 Multiple user IDs sharing an ORCID may share one Person. Multiple membership IDs
 may identify one ActivityPerson only when their role/active/PI values agree.
-Conflicting memberships stop the run.
+The entire incoming membership group is compared before writing, so identical
+changes to shared memberships succeed on later runs. Conflicting incoming
+memberships stop the run. Source identifiers, existing station links, and ORCID
+matches are loaded in batches. Each distinct incoming RAMS user is resolved
+once per run. Persisted records are re-read in batches for validation, avoiding
+a query per sampled field or project.
 
 Existing station values are curated and preserved, including Quail Ridge's
 corrected negative longitude, DOI and station-specific ROR decision. The source
@@ -86,15 +97,15 @@ The report records pulled/API totals for every collection, imported record count
 station differences, dropped-field occurrence/nonblank counts, and field-level
 comparisons for three current and five historical projects where available.
 Current means RAMS `status=open` with no end date or an end date on/after the
-run date. Historical means closed or an end date before the run date. Samples use the API's creation order: newest current and oldest
-historical projects. Sample shortfalls are explicit. Each sampled project is
-re-fetched from its detail endpoint and compared with the collection snapshot;
+run date. Historical means closed or an end date before the run date. Samples
+use the API's creation order: newest current and oldest historical projects.
+Sample shortfalls are explicit. Each sampled project is re-fetched from its detail endpoint and compared with the collection snapshot;
 all mapped fields, source IDs, station links, and owner/applicant person presence
 are checked against local records. Nested person names and normalized ORCIDs
 are compared individually; differences are explicit in the JSON rather than
-hiding source name variants behind a canonical Person name. Unmapped fields are labeled as such, not
-counted as successful storage comparisons. The detailed JSON includes source
-and stored values, while the checked-in run report summarizes findings without
+hiding source name variants behind a canonical Person name. Unmapped fields
+are labeled as such, not counted as successful storage comparisons. The detailed
+JSON includes source and stored values, while the checked-in run report summarizes findings without
 copying person names or ORCIDs.
 
 A production thesis title exceeded 255 characters during validation. The added

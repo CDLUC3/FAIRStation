@@ -65,6 +65,28 @@ class Rams::ClientTest < ActiveSupport::TestCase
     end
   end
 
+  test "empty collections stop after the first page" do
+    response = Net::HTTPOK.new("1.1", "200", "OK")
+    response.define_singleton_method(:body) do
+      { data: [], meta: { page: 1, per_page: 100, total_pages: 0, total_count: 0 } }.to_json
+    end
+    transport = Transport.new([ response ])
+    assert_equal({ "data" => [], "total_count" => 0 }, Rams::Client.new(token: "test-secret", transport: transport).collection("institutions"))
+    assert_equal 1, transport.requests.size
+  end
+
+  test "rejects malformed records and pagination metadata" do
+    [ { data: nil, meta: {} },
+      { data: [ nil ], meta: { page: 1, per_page: 100, total_pages: 1, total_count: 1 } },
+      { data: [], meta: { page: 1, per_page: 0, total_pages: 0, total_count: 0 } } ].each do |payload|
+      response = Net::HTTPOK.new("1.1", "200", "OK")
+      response.define_singleton_method(:body) { payload.to_json }
+      assert_raises(Rams::Error) do
+        Rams::Client.new(token: "test-secret", transport: Transport.new([ response ])).collection("projects")
+      end
+    end
+  end
+
   test "fails on invalid JSON without exposing response content" do
     response = Net::HTTPOK.new("1.1", "200", "OK")
     response.define_singleton_method(:body) { "invalid secret body" }
