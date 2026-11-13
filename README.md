@@ -11,8 +11,10 @@ Learn more at [fairstation.org](https://fairstation.org).
 ## Application baseline
 
 The application currently serves a public landing page at `/` and a deployment
-liveness check at `/up`. Research review, source integrations, and sign-in are
-not implemented; the research model and identity provider remain undecided.
+liveness check at `/up`. A manual Quail Ridge RAMS sync validates the initial
+station, research activity and person models in development. Research review
+and sign-in are not implemented; the broader model and identity provider remain
+undecided.
 
 The stack is Ruby **4.0.6**, Rails **8.1.4.1** (locked in `Gemfile.lock`), Puma,
 MySQL **8.4**, ERB, Hotwire (Turbo and Stimulus), importmap, and Propshaft. MySQL
@@ -94,6 +96,14 @@ check that `/assets/` requests succeed with no JavaScript errors.
 `/up` checks that Rails boots; it does **not** certify database connectivity,
 RAMS availability, or readiness of future integrations.
 
+## Quail Ridge RAMS validation
+
+Run `bin/rails rams:sync_quail_ridge` in development with a Quail Ridge-scoped
+production API token. See the [sync runbook](docs/rams_sync.md) for credentials,
+scope checks, repeat-run behavior and local evidence, and the
+[production validation report](docs/rams_sync_quail_ridge_validation.md) for
+counts, eight field-by-field project checks and the full dropped-fields list.
+
 ## Configuration and secrets
 
 - `config/database.yml` defines separate MySQL databases
@@ -159,4 +169,4 @@ testing, authorization boundaries, and external-source provenance.
 
 Existing `SCHEMA.md` and the domain/context documents under `docs/` are preserved
 exploration notes, not an approved schema, identity-provider choice, or description
-of implemented features. No domain models or integrations were added by this bootstrap.
+of implemented features. The implemented validation slice is described above.
