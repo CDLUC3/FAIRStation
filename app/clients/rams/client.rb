@@ -1,12 +1,16 @@
-require "net/http"
+require "faraday"
 require "json"
 
 module Rams
   # Read-only RAMS transport. Never follows redirects with the bearer token.
   class Client
-    def initialize(token:, transport: Net::HTTP, configuration: Configuration.load)
+    def initialize(token:, adapter: Faraday.default_adapter, configuration: Configuration.load)
       raise Error, "RAMS token is missing" if token.blank?
-      @token, @transport, @configuration = token, transport, configuration
+      @connection = Faraday.new(url: configuration.base_url,
+        headers: { "Authorization" => "Bearer #{token}", "Accept" => "application/json", "User-Agent" => "FAIRStation/1.0" },
+        request: { open_timeout: 10, read_timeout: 60 }, ssl: { verify: true }) do |connection|
+        connection.adapter(*adapter)
+      end
     end
 
     def collection(resource, **filters)
@@ -39,25 +43,18 @@ module Rams
     end
 
     def get(path, **query)
-      query_path = query.empty? ? path : "#{path}?#{URI.encode_www_form(query)}"
-      response = request(URI.join(@configuration.base_url, query_path))
+      response = @connection.get(path, query)
       verify_response!(response, path)
       JSON.parse(response.body)
     rescue JSON::ParserError
       raise Error, "Invalid RAMS JSON for #{path}"
-    rescue Timeout::Error, SocketError, SystemCallError, OpenSSL::SSL::SSLError
+    rescue Faraday::TimeoutError, Faraday::ConnectionFailed, Faraday::SSLError
       raise Error, "RAMS connection failed for #{path}; full run stopped"
     end
 
-    def request(uri)
-      request = Net::HTTP::Get.new(uri, "Authorization" => "Bearer #{@token}",
-        "Accept" => "application/json", "User-Agent" => "FAIRStation/1.0")
-      @transport.start(uri.hostname, uri.port, use_ssl: true, open_timeout: 10, read_timeout: 60) { |http| http.request(request) }
-    end
-
     def verify_response!(response, path)
-      return if response.is_a?(Net::HTTPSuccess)
-      raise Error, "RAMS HTTP #{response.code} for #{path}; full run stopped (Retry-After: #{response['Retry-After'] || 'none'})"
+      return if response.success?
+      raise Error, "RAMS HTTP #{response.status} for #{path}; full run stopped (Retry-After: #{response['Retry-After'] || 'none'})"
     end
   end
 end

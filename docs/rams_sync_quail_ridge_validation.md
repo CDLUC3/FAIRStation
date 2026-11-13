@@ -249,7 +249,7 @@ Every observed leaf path not imported into the domain graph is listed below, inc
 
 ## Verification
 
-`bin/ci` passed with Ruby 4.0.6: 49 tests, 231 assertions; RuboCop, dependency audits, Brakeman and Zeitwerk all passed. Tests use synthetic data and HTTP-boundary doubles, never RAMS production. The live repeat run preserved counts for Station, ResearchActivity, Person, ActivityPerson, ActivityStation and SourceIdentifier.
+`bin/ci` passed with Ruby 4.0.6: 51 tests, 292 assertions; RuboCop, dependency audits, Brakeman and Zeitwerk all passed. Tests use synthetic data and HTTP-boundary doubles, never RAMS production. The live repeat run preserved counts for Station, ResearchActivity, Person, ActivityPerson, ActivityStation and SourceIdentifier.
 
 ## Review follow-up validation
 
@@ -266,3 +266,9 @@ and bounded SELECT counts as the number of projects grows. Persisted values are
 re-read in batches for report comparisons. Source snapshots are staged before
 import and the report is flushed and synced before commit, so evidence-write
 failures prevent the database import from committing.
+
+The HTTP client now uses Faraday 2 with Faraday's test adapter for boundary tests.
+The transport change passed a read-only production smoke check for the Quail
+Ridge reserve collection and a sampled project detail. No database writes were
+performed by that smoke check. Timeout, TLS, redirect, rate-limit and sanitized
+error behavior are covered by the client tests.

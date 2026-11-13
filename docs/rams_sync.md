@@ -27,6 +27,9 @@ Non-secret settings and the field crosswalk live in `config/rams.yml`, loaded
 through `Rams::Configuration`. This test configuration pins Quail Ridge and
 the production base URL, `https://rams.ucnature.org/api/v1/`.
 There is no environment fallback. An empty project collection stops the run.
+The client uses Faraday with its Net::HTTP adapter, verified TLS, a 10-second
+connection timeout and a 60-second read timeout. It configures no redirect or
+retry middleware. Tests use Faraday's test adapter at the HTTP boundary.
 All collection requests use `per_page=100` and follow RAMS pagination metadata.
 No endpoint receives `updated_since`. Retrieval order is reserves, projects,
 team memberships, visits, fundings, institutions. Memberships and institutions
