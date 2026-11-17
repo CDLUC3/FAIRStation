@@ -11,7 +11,6 @@
 
 - [ ] AI reviewed?
 - [ ] Tested locally?
-- [ ] Tested in `dev`?
 
 *Describe what code reviewers should focus on*
 
