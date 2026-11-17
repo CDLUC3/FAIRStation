@@ -33,6 +33,21 @@ deferred; nothing here claims a deployed environment.
   `/up` are the only public surfaces. Do not publish operational or research data
   before authorization exists.
 
+## External sources
+
+- **FAIR Station's domain is independent of external source formats.** Source
+  adapters interpret external payloads and translate them into FAIR Station
+  import records. The application owns persistence, identity reconciliation,
+  curated-value protection, and repeat-import behavior.
+- **Source type, installation, and import scope are separate.** RAMS is an adapter
+  type; UC Nature is an API installation; Quail Ridge is a reserve within that
+  installation. `config/sources.yml` holds connection settings and a Rails
+  credential path, not field mappings or reserve metadata. A source namespace
+  stays stable across reserve selections and credential rotation.
+- **RAMS metadata comes from the API.** Reserve selections identify what to import;
+  `/reserves` supplies reserve metadata. Discovering a reserve does not grant
+  FAIR Station authorization to it. Shared RAMS mappings belong in adapter code.
+
 ## Branches and releases
 
 - **`main` is the trunk and the released branch.** Feature PRs target `main` and

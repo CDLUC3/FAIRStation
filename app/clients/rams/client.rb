@@ -4,9 +4,9 @@ require "json"
 module Rams
   # Read-only RAMS transport. Never follows redirects with the bearer token.
   class Client
-    def initialize(token:, adapter: Faraday.default_adapter, configuration: Configuration.load)
+    def initialize(token:, base_url:, adapter: Faraday.default_adapter)
       raise Error, "RAMS token is missing" if token.blank?
-      @connection = Faraday.new(url: configuration.base_url,
+      @connection = Faraday.new(url: base_url,
         headers: { "Authorization" => "Bearer #{token}", "Accept" => "application/json", "User-Agent" => "FAIRStation/1.0" },
         request: { open_timeout: 10, read_timeout: 60 }, ssl: { verify: true }) do |connection|
         connection.adapter(*adapter)

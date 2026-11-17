@@ -11,7 +11,7 @@ class Rams::ClientTest < ActiveSupport::TestCase
         response.respond_to?(:call) ? response.call : response
       end
     end
-    Rams::Client.new(token: "test-secret", adapter: [ :test, @stubs ])
+    Rams::Client.new(token: "test-secret", base_url: "https://rams.example/api/v1/", adapter: [ :test, @stubs ])
   end
 
   def page(number, ids, total: 2)
@@ -28,6 +28,7 @@ class Rams::ClientTest < ActiveSupport::TestCase
     @requests.each_with_index do |request, i|
       assert_equal :get, request.method
       assert_equal "https", request.url.scheme
+      assert_equal "rams.example", request.url.host
       assert_equal "/api/v1/projects", request.url.path
       assert_equal "Bearer test-secret", request.request_headers["Authorization"]
       assert_equal "application/json", request.request_headers["Accept"]
