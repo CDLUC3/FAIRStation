@@ -19,7 +19,7 @@ Activate `.ruby-version` before running commands.
 Application secrets live in Rails encrypted credentials. Deployment supplies
 only `RAILS_MASTER_KEY` (or a mounted `config/master.key`); do not add separate
 environment variables for `SECRET_KEY_BASE` or integration keys. CI/tooling
-tokens such as `RELEASE_PLEASE_TOKEN` stay in GitHub Actions.
+credentials such as `RELEASE_APP_PRIVATE_KEY` stay in GitHub Actions.
 
 ## Read when relevant
 
