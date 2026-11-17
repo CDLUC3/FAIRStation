@@ -9,6 +9,7 @@
 
 ## Review
 
+- [ ] Self-reviewed?
 - [ ] AI reviewed?
 - [ ] Tested locally?
 
