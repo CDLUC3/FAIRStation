@@ -1,11 +1,21 @@
-## What
+## Summary
 
-<!-- The change, in a sentence or two. Link the issue. -->
+*Describe what changed in 1-2 sentences*
 
-## Why
+## Notes
 
-<!-- The problem, cause, or decision behind it. Skip if the title says it all. -->
+- *Added a new API endpoint*
+- *Added a button to the UI*
 
-## Verification
+## Review
 
-<!-- Commands run and what they showed; note anything not run. -->
+- [ ] AI reviewed?
+- [ ] Tested locally?
+- [ ] Tested in `dev`?
+
+*Describe what code reviewers should focus on*
+
+## Progress
+
+- *Closes cdlib/repo#X*
+- *Refs cdlib/repo#Y*
