@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_11_10_185543) do
+ActiveRecord::Schema[8.1].define(version: 2026_11_13_010221) do
   create_table "activity_people", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
     t.bigint "research_activity_id", null: false
     t.bigint "person_id", null: false
@@ -53,7 +53,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_10_185543) do
     t.string "discipline_other"
     t.text "keywords"
     t.text "taxonomic_keywords"
-    t.string "thesis_title"
+    t.text "thesis_title"
     t.string "course_title"
     t.string "course_number"
     t.datetime "submitted_at"
