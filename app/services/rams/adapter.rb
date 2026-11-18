@@ -40,12 +40,7 @@ module Rams
     def station(collections)
       row = rows(collections, "reserves").find { |candidate| candidate.fetch("id") == reserve_id }
       raise Error, "Selected reserve #{reserve_id} is absent from source data" unless row
-      attributes = row.slice(*STATION_FIELDS).symbolize_keys
-      # UC Nature's directory has a known sign error for Quail Ridge; see db/seeds.rb.
-      if source[:source_instance] == "ucnature" && reserve_id == 27 && attributes[:longitude].to_s == "122.149444"
-        attributes[:longitude] = "-122.14944444"
-      end
-      Imports::Batch::StationInput.new(external_id: reserve_id, attributes: attributes)
+      Imports::Batch::StationInput.new(external_id: reserve_id, attributes: row.slice(*STATION_FIELDS).symbolize_keys)
     end
 
     def rows(collections, resource) = collections.fetch(resource).fetch("data")

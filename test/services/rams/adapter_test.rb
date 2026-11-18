@@ -38,8 +38,8 @@ class Rams::AdapterTest < ActiveSupport::TestCase
     assert_equal 122.149444, translate.stations.sole.attributes[:longitude]
   end
 
-  test "corrects only the known UC Nature Quail Ridge longitude without changing source data" do
-    assert_equal "-122.14944444", translate.stations.sole.attributes[:longitude]
+  test "passes directory coordinates through without changing source data" do
+    assert_equal 122.149444, translate.stations.sole.attributes[:longitude]
     assert_equal 122.149444, @rows["reserves"].sole.fetch("longitude")
     @rows["reserves"].sole["longitude"] = -122.15
     assert_equal(-122.15, translate.stations.sole.attributes[:longitude])

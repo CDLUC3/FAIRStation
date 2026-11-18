@@ -20,9 +20,9 @@ metadata comes from the retrieved directory, not per-reserve YAML. Selected
 membership references determine which people and roles are included.
 Owners and applicants without selected memberships are not emitted as people;
 their relationships remain unmodeled. Assertions about selected people still
-participate in ORCID consistency checks. The adapter corrects UC Nature reserve
-27's known positive longitude to the verified Quail Ridge coordinate in
-`db/seeds.rb`; other reserves and installations retain their supplied values.
+participate in ORCID consistency checks. Directory coordinates pass through
+unchanged; corrections belong in the source data. Quail Ridge's known longitude
+sign error is tracked in [ngRAMS #256](https://github.com/CDLUC3/ngRAMS/issues/256).
 
 This layer does not retrieve source collections, persist records, reconcile
 people by ORCID, or generate diagnostic reports. Repeated assertions about the
