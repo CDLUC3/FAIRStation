@@ -53,21 +53,35 @@ class Imports::BatchImportTest < ActiveSupport::TestCase
     assert_empty ResearchActivity.all
     assert_empty SourceIdentifier.all
   end
-  test "the draft ORCID policy reuses an existing person without matching names" do
+  test "an asserted ORCID cannot link a new source identity to an existing person" do
     existing = Person.create!(name: "Earlier name", orcid: "0000-0002-1825-0097")
     input = batch.people.sole.with(attributes: { name: "Current source name", orcid: "https://orcid.org/0000-0002-1825-0097" })
-    import(batch.with(people: [ input ]))
+    assert_raises(Imports::Error) { import(batch.with(people: [ input ])) }
     assert_equal 1, Person.count
-    assert_equal existing, SourceIdentifier.find_by!(record_type: "Person", external_id: "person-a").record
-    assert_equal "Current source name", existing.reload.name
+    assert_equal "Earlier name", existing.reload.name
+    assert_empty SourceIdentifier.all
+    assert_empty Station.all
+    assert_empty ResearchActivity.all
   end
 
-  test "the draft ORCID policy can associate two source IDs with one person" do
+  test "two source identities asserting the same ORCID fail atomically" do
     first = batch.people.sole.with(attributes: { name: "Same person", orcid: "0000-0002-1825-0097" })
     second = first.with(external_id: "person-b")
-    import(batch.with(people: [ first, second ]))
-    assert_equal 1, Person.count
-    assert_equal 2, Person.sole.source_identifiers.count
+    assert_raises(Imports::Error) { import(batch.with(people: [ first, second ])) }
+    assert_empty Person.all
+    assert_empty SourceIdentifier.all
+    assert_empty Station.all
+  end
+
+  test "a known source identity can refresh attributes without an ORCID merge" do
+    input = batch.people.sole.with(attributes: { name: "Earlier name", orcid: "0000-0002-1825-0097" })
+    import(batch.with(people: [ input ]))
+    person = Person.sole
+    refreshed = input.with(attributes: { name: "Current source name", orcid: "https://orcid.org/0000-0002-1825-0097" })
+    import(batch.with(people: [ refreshed ]))
+    assert_equal person, Person.sole
+    assert_equal "Current source name", person.reload.name
+    assert_equal 1, person.source_identifiers.count
   end
 
   test "contradictory ORCID and source identities fail atomically" do

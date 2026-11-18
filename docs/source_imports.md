@@ -51,12 +51,13 @@ people, activities, then memberships. Its caller owns the database transaction.
 in one installation to its FAIR Station object. It batches lookups and stores
 source identifiers; it is import infrastructure, not a new domain entity.
 
-`PersonIdentity` is a separate policy. The current proposal reuses an existing
-source identity, otherwise matches a normalized supplied ORCID; conflicting
-source/ORCID identities stop the import. Several source IDs may identify one
-Person. Names are not identity keys. A supplied ORCID is not independent identity
-verification. Automatic cross-source ORCID association is a draft policy that
-needs agreement before this layer is ready to merge.
+`PersonIdentity` reuses an existing source identity. A normalized supplied ORCID
+is a source assertion, not permission to link another source ID to a Person.
+If that ORCID belongs to another Person, or contradicts the known source
+identity's ORCID, the import stops and its transaction rolls back. This also
+applies to distinct source IDs within the same batch. Names are not identity
+keys. Reviewed identity linking remains outside this slice; there is no review
+queue or automatic cross-source association.
 
 Reruns preserve local object IDs and existing station values. Imported person,
 activity and membership attributes can refresh. Removals, per-field human-edit
