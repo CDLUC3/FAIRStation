@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_11_13_010221) do
+ActiveRecord::Schema[8.1].define(version: 2026_11_18_213810) do
   create_table "activity_people", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
     t.bigint "research_activity_id", null: false
     t.bigint "person_id", null: false
@@ -32,6 +32,21 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_13_010221) do
     t.index ["research_activity_id", "station_id"], name: "index_activity_stations_on_research_activity_id_and_station_id", unique: true
     t.index ["research_activity_id"], name: "index_activity_stations_on_research_activity_id"
     t.index ["station_id"], name: "index_activity_stations_on_station_id"
+  end
+
+  create_table "import_runs", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
+    t.string "source_system", limit: 128, null: false
+    t.string "source_instance", limit: 128, null: false
+    t.string "station_external_id", null: false
+    t.datetime "retrieved_at", null: false
+    t.datetime "successful_at", null: false
+    t.text "snapshot_path", null: false
+    t.text "metadata_path", null: false
+    t.string "snapshot_sha256", limit: 64, null: false
+    t.string "metadata_sha256", limit: 64, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["source_system", "source_instance", "station_external_id", "successful_at"], name: "index_import_runs_on_source_station_success"
   end
 
   create_table "people", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
@@ -69,6 +84,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_13_010221) do
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.string "source_instance", limit: 128, null: false
+    t.bigint "import_run_id"
+    t.index ["import_run_id"], name: "index_source_identifiers_on_import_run_id"
     t.index ["record_type", "record_id"], name: "index_source_identifiers_on_record"
     t.index ["source_system", "source_instance", "record_type", "external_id"], name: "index_source_identifiers_on_source_identity", unique: true
   end
@@ -89,4 +106,5 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_13_010221) do
   add_foreign_key "activity_people", "research_activities"
   add_foreign_key "activity_stations", "research_activities"
   add_foreign_key "activity_stations", "stations"
+  add_foreign_key "source_identifiers", "import_runs"
 end

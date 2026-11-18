@@ -1,8 +1,8 @@
 module Imports
   # Per-run identity map: typed source lookups and station links are loaded in batches.
   class SourceIdentityMap
-    def initialize(source:)
-      @source = source
+    def initialize(source:, import_run: nil)
+      @source, @import_run = source, import_run
       @identifiers = SourceIdentifier.where(source).preload(:record).index_by { |identifier| key(identifier.record_type, identifier.external_id) }
       preload_stations
     end
@@ -16,7 +16,8 @@ module Imports
     def identify(record, id)
       existing = @identifiers[key(record.class.name, id)]
       raise Error, "Source identity conflict" if existing && existing.record != record
-      @identifiers[key(record.class.name, id)] ||= SourceIdentifier.create!(**@source, external_id: id.to_s, record: record)
+      identifier = @identifiers[key(record.class.name, id)] ||= SourceIdentifier.create!(**@source, external_id: id.to_s, record: record)
+      identifier.update_columns(import_run_id: @import_run.id, updated_at: Time.current) if @import_run && identifier.import_run_id != @import_run.id
       record
     end
 

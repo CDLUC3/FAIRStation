@@ -1,9 +1,13 @@
 module Imports
   # Persists translated records without knowing the external payload format. The caller owns the transaction.
   class BatchImport
-    def initialize(batch:)
+    def initialize(batch:, import_run: nil)
       @batch = batch
-      @records = SourceIdentityMap.new(source: batch.source)
+      if import_run && (batch.source.any? { |key, value| import_run.public_send(key) != value } ||
+          batch.stations.none? { |row| row.external_id.to_s == import_run.station_external_id })
+        raise Error, "Import receipt does not match the batch source and station"
+      end
+      @records = SourceIdentityMap.new(source: batch.source, import_run: import_run)
       @people = PersonIdentity.new(identities: @records, people: batch.people)
     end
 

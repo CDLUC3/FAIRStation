@@ -64,3 +64,18 @@ activity and membership attributes can refresh. Removals, per-field human-edit
 protection, and complete change history remain outside this slice (#33).
 The thesis-title migration widens a string to text to avoid truncation; its
 rollback is explicitly irreversible.
+
+## Successful sync receipts
+
+`ImportRun` records each committed sync's source namespace, station source ID,
+retrieval time, successful completion time, and local evidence paths with SHA-256
+checksums. `last_successful_sync(source:, station_external_id:)` provides matching
+freshness for one station and installation. Source identifiers processed by the
+batch point to that receipt; existing identifiers can remain unlinked until their
+next sync. Shared records point to their most recent processed run, while prior
+receipts remain available. This is run-level evidence, not per-field history or
+proof that unchanged curated station fields came from the source.
+
+The workflow must create the receipt and import records in the same transaction.
+Failed attempts must not advance freshness. Evidence remains local and restricted;
+paths and checksums identify it but do not provide remote backup or retention.

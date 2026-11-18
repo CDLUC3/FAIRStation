@@ -1,5 +1,6 @@
 class SourceIdentifier < ApplicationRecord
   belongs_to :record, polymorphic: true
+  belongs_to :import_run, optional: true
 
   validates :source_system, :source_instance, :external_id, presence: true
   validates :source_system, :source_instance, length: { maximum: 128 }
