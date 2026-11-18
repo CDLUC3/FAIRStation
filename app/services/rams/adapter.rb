@@ -31,7 +31,7 @@ module Rams
       Imports::Batch.new(source: source,
         stations: [ station(collections) ],
         people: users(collections).map { |row| Imports::Batch::PersonInput.new(external_id: row.fetch("id"), attributes: { name: row.fetch("full_name"), orcid: row.fetch("orcid") }) },
-        activities: rows(collections, "projects").map { |row| activity(row) },
+        activities: projects(collections).map { |row| activity(row) },
         memberships: memberships(collections).map { |row| membership(row) })
     end
 
@@ -45,15 +45,25 @@ module Rams
 
     def rows(collections, resource) = collections.fetch(resource).fetch("data")
 
+    def projects(collections)
+      ids = rows(collections, "visits").select { |row| row.dig("reserve", "id") == reserve_id }
+        .map { |row| row.fetch("project").fetch("id") }.to_set
+      selected = rows(collections, "projects").select { |row| ids.include?(row.fetch("id")) }
+      unless selected.pluck("id").to_set == ids
+        raise Error, "Visit-linked projects are missing from source data"
+      end
+      selected
+    end
+
     def memberships(collections)
-      project_ids = rows(collections, "projects").pluck("id").to_set
+      project_ids = projects(collections).pluck("id").to_set
       rows(collections, "team_memberships").select { |row| project_ids.include?(row.fetch("project").fetch("id")) }
     end
 
     def users(collections)
       membership_users = memberships(collections).filter_map { |row| row["user"] }
       user_ids = membership_users.pluck("id").to_set
-      project_users = rows(collections, "projects").flat_map { |row| row.values_at("owner", "applicant") }
+      project_users = projects(collections).flat_map { |row| row.values_at("owner", "applicant") }
       assertions = project_users.compact.select { |row| user_ids.include?(row.fetch("id")) } + membership_users
       assertions.group_by { |row| row.fetch("id") }.values.map { |rows| user_assertion(rows) }
     end
@@ -66,7 +76,7 @@ module Rams
 
     def activity(row)
       attributes = PROJECT_FIELDS.to_h { |source, target| [ target, row.fetch(source) ] }
-      Imports::Batch::ActivityInput.new(external_id: row.fetch("id"), attributes: attributes, station_ids: [ row.fetch("reserve").fetch("id") ])
+      Imports::Batch::ActivityInput.new(external_id: row.fetch("id"), attributes: attributes, station_ids: [ reserve_id ])
     end
 
     def membership(row)

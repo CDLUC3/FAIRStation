@@ -32,7 +32,7 @@ class Rams::AdapterTest < ActiveSupport::TestCase
   test "another reserve uses the same mappings and directory metadata" do
     @adapter = Rams::Adapter.new(connection: SourceConnection.load(:ucnature), reserve_id: 3)
     @rows["reserves"].first.merge!("id" => 3, "name" => "Another reserve")
-    @rows["projects"].each { |row| row["reserve"]["id"] = 3 }
+    @rows["visits"].each { |row| row["reserve"]["id"] = 3 }
     assert_equal "Another reserve", translate.stations.sole.attributes[:name]
     assert_equal [ 3 ], translate.activities.first.station_ids
     assert_equal 122.149444, translate.stations.sole.attributes[:longitude]
@@ -64,6 +64,38 @@ class Rams::AdapterTest < ActiveSupport::TestCase
     @rows["team_memberships"] << { "id" => 900, "project" => { "id" => 900 }, "user" => { "id" => 900 } }
     assert_equal 1, translate.memberships.size
     assert_equal 1, translate.people.size
+  end
+
+  test "visits select projects and attribute them regardless of assigned reserve" do
+    @rows["projects"][0]["reserve"] = nil
+    @rows["projects"][1]["reserve"] = { "id" => 3 }
+    @rows["visits"] = @rows["visits"].first(2)
+    batch = translate
+    assert_equal [ 27, 28 ], batch.activities.map(&:external_id)
+    assert_equal [ [ 27 ] ], batch.activities.map(&:station_ids).uniq
+    assert_equal [ 27 ], batch.memberships.map(&:activity_id)
+  end
+
+  test "a project visiting several reserves is attributed to each selected station" do
+    @rows["reserves"] << @rows["reserves"].first.merge("id" => 3)
+    @rows["visits"] << @rows["visits"].first.merge("id" => 900, "reserve" => { "id" => 3 })
+    assert_equal [ 27 ], translate.activities.first.station_ids
+    @adapter = Rams::Adapter.new(connection: SourceConnection.load(:ucnature), reserve_id: 3)
+    assert_equal [ 27 ], translate.activities.map(&:external_id)
+    assert_equal [ 3 ], translate.activities.sole.station_ids
+  end
+
+  test "projects without visits do not import their people or memberships" do
+    @rows["visits"] = []
+    batch = translate
+    assert_empty batch.activities
+    assert_empty batch.memberships
+    assert_empty batch.people
+  end
+
+  test "missing visit-linked projects stop translation" do
+    @rows["projects"].shift
+    assert_raises(Rams::Error) { translate }
   end
 
   test "contradictory ORCID assertions for the same source person stop translation" do

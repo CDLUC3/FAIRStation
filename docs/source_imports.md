@@ -29,11 +29,16 @@ people by ORCID, or generate diagnostic reports. Repeated assertions about the
 same RAMS user must agree on ORCID; this is input consistency, not cross-user
 identity matching.
 
-## Scope decision still needed
+## Visit-based scope
 
-RAMS allows projects with no assigned reserve and projects with visits at several
-reserves. The caller must supply an agreed selection of projects. This adapter
-currently uses each project's supplied reserve association for station links;
-it does not infer links from visits or repair missing reserve assignments. API
-selection and attribution need explicit review before the runnable import is
-ready for use. Tests use synthetic data; production audit results stay private.
+A RAMS project is selected when it has at least one visit at the selected reserve,
+past or scheduled. Assigned reserve and reserve interest do not select projects
+or determine station links. Each selected activity links to the current station;
+syncing another station visited by the same project adds that station as well.
+Visits establish scope, not proof of attendance. No visit status is interpreted
+as a human review decision. Missing visit-linked projects stop translation rather
+than silently producing a partial import.
+
+The retrieval layer must obtain all visit-linked projects using the token's API
+permissions. Tests use synthetic data, including a project visiting two stations;
+no live Sentinel Sites data was used. Production audit results stay private.

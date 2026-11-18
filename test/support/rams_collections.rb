@@ -13,7 +13,7 @@ module RamsCollections
       "team_memberships" => [ { "id" => 27, "project" => { "id" => 27 }, "user" => user,
                                 "user_role" => "graduate_student", "active" => false, "is_principal_investigator" => true,
                                 "institution" => { "id" => 2, "name" => "University" } } ],
-      "visits" => [ { "id" => 1, "reserve" => { "id" => 27 }, "project" => { "id" => 27 }, "status" => "approved" } ],
+      "visits" => (27..34).map { |id| { "id" => id, "reserve" => { "id" => 27 }, "project" => { "id" => id }, "status" => "approved" } },
       "fundings" => [ { "id" => 1, "reserve" => { "id" => 27 }, "project" => { "id" => 27 }, "grant_number" => "123" } ],
       "institutions" => [ { "id" => 2, "name" => "University", "ror" => { "ror_id" => "https://ror.org/example" } } ]
     }
