@@ -42,3 +42,40 @@ than silently producing a partial import.
 The retrieval layer must obtain all visit-linked projects using the token's API
 permissions. Tests use synthetic data, including a project visiting two stations;
 no live Sentinel Sites data was used. Production audit results stay private.
+
+## Persistence and identity (draft)
+
+`Imports::BatchImport` persists proposed attributes in dependency order: stations,
+people, activities, then memberships. Its caller owns the database transaction.
+`SourceIdentityMap` is a per-run lookup/cache from a typed external identifier
+in one installation to its FAIR Station object. It batches lookups and stores
+source identifiers; it is import infrastructure, not a new domain entity.
+
+`PersonIdentity` reuses an existing source identity. A normalized supplied ORCID
+is a source assertion, not permission to link another source ID to a Person.
+If that ORCID belongs to another Person, or contradicts the known source
+identity's ORCID, the import stops and its transaction rolls back. This also
+applies to distinct source IDs within the same batch. Names are not identity
+keys. Reviewed identity linking remains outside this slice; there is no review
+queue or automatic cross-source association.
+
+Reruns preserve local object IDs and existing station values. Imported person,
+activity and membership attributes can refresh. Removals, per-field human-edit
+protection, and complete change history remain outside this slice (#33).
+The thesis-title migration widens a string to text to avoid truncation; its
+rollback is explicitly irreversible.
+
+## Successful sync receipts
+
+`ImportRun` records each committed sync's source namespace, station source ID,
+retrieval time, successful completion time, and local evidence paths with SHA-256
+checksums. `last_successful_sync(source:, station_external_id:)` provides matching
+freshness for one station and installation. Source identifiers processed by the
+batch point to that receipt; existing identifiers can remain unlinked until their
+next sync. Shared records point to their most recent processed run, while prior
+receipts remain available. This is run-level evidence, not per-field history or
+proof that unchanged curated station fields came from the source.
+
+The workflow must create the receipt and import records in the same transaction.
+Failed attempts must not advance freshness. Evidence remains local and restricted;
+paths and checksums identify it but do not provide remote backup or retention.
