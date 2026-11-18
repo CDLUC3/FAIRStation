@@ -32,3 +32,24 @@ currently uses each project's supplied reserve association for station links;
 it does not infer links from visits or repair missing reserve assignments. API
 selection and attribution need explicit review before the runnable import is
 ready for use. Tests use synthetic data; production audit results stay private.
+
+## Persistence and identity (draft)
+
+`Imports::BatchImport` persists proposed attributes in dependency order: stations,
+people, activities, then memberships. Its caller owns the database transaction.
+`SourceIdentityMap` is a per-run lookup/cache from a typed external identifier
+in one installation to its FAIR Station object. It batches lookups and stores
+source identifiers; it is import infrastructure, not a new domain entity.
+
+`PersonIdentity` is a separate policy. The current proposal reuses an existing
+source identity, otherwise matches a normalized supplied ORCID; conflicting
+source/ORCID identities stop the import. Several source IDs may identify one
+Person. Names are not identity keys. A supplied ORCID is not independent identity
+verification. Automatic cross-source ORCID association is a draft policy that
+needs agreement before this layer is ready to merge.
+
+Reruns preserve local object IDs and existing station values. Imported person,
+activity and membership attributes can refresh. Removals, per-field human-edit
+protection, and complete change history remain outside this slice (#33).
+The thesis-title migration widens a string to text to avoid truncation; its
+rollback is explicitly irreversible.
