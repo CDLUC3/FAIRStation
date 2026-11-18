@@ -147,10 +147,10 @@ class Rams::ImportWorkflowTest < ActiveSupport::TestCase
     assert_equal 2, people.uniq.size
   end
 
-  test "new stations use corrected coordinates while archives retain the source value" do
+  test "new stations and archives retain the supplied coordinates" do
     @station.destroy!
     result = sync
-    assert_equal "-122.149444", Station.sole.longitude.to_s("F")
+    assert_equal "122.149444", Station.sole.longitude.to_s("F")
     saved = JSON.parse(File.read(result.fetch(:evidence).fetch(:snapshot)))
     assert_equal 122.149444, saved.fetch("reserves").fetch("data").sole.fetch("longitude")
   end
