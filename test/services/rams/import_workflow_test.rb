@@ -25,8 +25,9 @@ class Rams::ImportWorkflowTest < ActiveSupport::TestCase
     other = @rows.fetch("team_memberships").first.deep_dup
     other["id"] = 28
     @rows.fetch("team_memberships") << other
-    sync
+    result = sync
     assert_equal 1, ActivityPerson.count
+    assert_equal 1, result.fetch(:imported).fetch("ActivityPerson")
     @rows.fetch("team_memberships").each { |row| row["user_role"] = "postdoc" }
     sync
     assert_equal "postdoc", ActivityPerson.sole.role
@@ -199,6 +200,24 @@ class Rams::ImportWorkflowTest < ActiveSupport::TestCase
     assert_equal "Another", station.short_name
     assert_equal [ station ], ResearchActivity.first.stations.to_a
     assert_equal 2, Station.count
+  end
+
+  test "imported counts include only distinct records processed by this run" do
+    first = sync
+    assert_equal({ "Station" => 1, "ResearchActivity" => 8, "Person" => 1, "ActivityPerson" => 1 }, first.fetch(:imported))
+    @adapter = Rams::Adapter.new(connection: @connection, reserve_id: 3)
+    @rows["reserves"].sole.merge!("id" => 3, "name" => "Another reserve")
+    user = { "id" => 900, "full_name" => "Another researcher", "orcid" => nil }
+    @rows["projects"] = [ @rows["projects"].first.merge("id" => 900, "reserve" => { "id" => 3 }, "owner" => user) ]
+    @rows["team_memberships"] = [ @rows["team_memberships"].sole.merge("id" => 900, "project" => { "id" => 900 }, "user" => user) ]
+    %w[visits fundings].each do |resource|
+      @rows[resource].each { |row| row.merge!("reserve" => { "id" => 3 }, "project" => { "id" => 900 }) }
+    end
+    expected = { "Station" => 1, "ResearchActivity" => 1, "Person" => 1, "ActivityPerson" => 1 }
+    assert_equal expected, sync.fetch(:imported)
+    assert_equal [ 2, 9, 2, 2 ], [ Station.count, ResearchActivity.count, Person.count, ActivityPerson.count ]
+    assert_equal expected, sync.fetch(:imported)
+    assert_equal [ 2, 9, 2, 2 ], [ Station.count, ResearchActivity.count, Person.count, ActivityPerson.count ]
   end
 
   test "out of scope projects stop before writes" do

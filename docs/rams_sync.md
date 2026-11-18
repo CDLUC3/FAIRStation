@@ -12,6 +12,9 @@ translates the collections before any database transaction. The importer saves
 stations, people, activities and memberships atomically; visits, institutions,
 funding and owner/applicant relationships remain unmodeled. Reruns refresh mapped
 fields without duplicating source identities. Removals remain outside this slice.
+The imported-record summary counts distinct records processed by the current
+batch, including existing records on reruns, rather than installation-wide
+totals or only newly created records.
 
 `Rams::Snapshot` is a collected set of API responses, not an atomic point-in-time
 snapshot. Offset pagination cannot detect every equal-count source change.

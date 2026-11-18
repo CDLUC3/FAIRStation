@@ -12,7 +12,7 @@ module Imports
         ApplicationRecord.transaction do
           records = BatchImport.new(batch: batch).call
           { source: batch.source, retrieved_at: snapshot.retrieved_at,
-            counts: snapshot.counts, imported: records.counts, evidence: paths }
+            counts: snapshot.counts, imported: records.counts(batch: batch), evidence: paths }
         end
       end
     end

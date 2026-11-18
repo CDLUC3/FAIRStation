@@ -21,9 +21,10 @@ module Imports
       record
     end
 
-    def counts
-      [ Station, ResearchActivity, Person, ActivityPerson ].to_h do |type|
-        records = @identifiers.values.select { |identifier| identifier.record_type == type.name }.map(&:record_id)
+    def counts(batch:)
+      { Station => batch.stations, ResearchActivity => batch.activities,
+        Person => batch.people, ActivityPerson => batch.memberships }.to_h do |type, rows|
+        records = rows.map { |row| fetch(type, row.external_id).id }
         [ type.name, records.uniq.size ]
       end
     end
