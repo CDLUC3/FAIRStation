@@ -27,6 +27,10 @@ module Rams
 
     def source = connection.source
 
+    def pull(client:)
+      Snapshot.pull(client: client, adapter: self).tap(&:verify!)
+    end
+
     def translate(collections:)
       Imports::Batch.new(source: source,
         stations: [ station(collections) ],
