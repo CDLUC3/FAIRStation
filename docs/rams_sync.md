@@ -31,7 +31,8 @@ not yet a persisted, per-record provenance history.
 - RAMS permits reserve-independent projects and cross-reserve visits. The current
   selected-project query uses the optional project reserve; inclusion through
   visits and activity/station attribution need agreement before use.
-- Person association by supplied ORCID is a separate draft identity policy.
+- Source IDs establish person identity. Conflicting ORCID assertions stop the
+  import; reviewed linking of different source identities remains undecided.
 - Whether this development task should be retained needs Danny's clarification.
 - Detailed comparison tooling is deferred. The import requires its source
   archive, but does not require a separate comparison report to commit.

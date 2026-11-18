@@ -24,7 +24,6 @@ class Rams::ImportWorkflowTest < ActiveSupport::TestCase
   test "shared identity memberships can change roles together on a later run" do
     other = @rows.fetch("team_memberships").first.deep_dup
     other["id"] = 28
-    other["user"]["id"] = 28
     @rows.fetch("team_memberships") << other
     sync
     assert_equal 1, ActivityPerson.count
@@ -38,7 +37,6 @@ class Rams::ImportWorkflowTest < ActiveSupport::TestCase
     sync
     other = @rows.fetch("team_memberships").first.deep_dup
     other["id"] = 28
-    other["user"]["id"] = 28
     other["user_role"] = "postdoc"
     @rows.fetch("team_memberships") << other
     assert_raises(Imports::Error) { sync }
@@ -128,12 +126,23 @@ class Rams::ImportWorkflowTest < ActiveSupport::TestCase
     assert_equal({ reserve_id: 27 }, @client.requests[1].last)
   end
 
-  test "ORCID matches an existing person and never merges people by name" do
+  test "an asserted ORCID collision stops the import and removes its archive" do
     existing = Person.create!(name: "Earlier name", orcid: "0000-0002-1825-0097")
+    assert_raises(Imports::Error) { sync }
+    assert_equal [ existing ], Person.all.to_a
+    assert_equal "Earlier name", existing.reload.name
+    assert_empty existing.source_identifiers
+    assert_empty ResearchActivity.all
+    assert_empty Dir.children(@evidence_directory)
+  end
+
+  test "names alone never merge source identities" do
     @rows["projects"].last["applicant"] = { "id" => 28, "full_name" => "Researcher", "orcid" => nil }
     sync
     assert_equal 2, Person.count
-    assert_equal existing, SourceIdentifier.find_by!(record_type: "Person", external_id: "27").record
+    assert_equal [ "Researcher" ], Person.distinct.pluck(:name)
+    people = SourceIdentifier.where(record_type: "Person", external_id: %w[27 28]).pluck(:record_id)
+    assert_equal 2, people.uniq.size
   end
 
   test "empty projects and missing selected reserves stop before any writes" do
