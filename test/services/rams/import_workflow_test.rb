@@ -101,6 +101,7 @@ class Rams::ImportWorkflowTest < ActiveSupport::TestCase
 
   test "imports the graph, nullable ORCIDs, roles and source namespaces without duplicating reruns" do
     @rows["projects"].last["applicant"] = { "id" => 28, "full_name" => "No ORCID", "orcid" => nil }
+    @rows["team_memberships"] << @rows["team_memberships"].first.merge("id" => 28, "project" => { "id" => 34 }, "user" => @rows["projects"].last["applicant"])
     @rows["projects"].first["thesis_title"] = "Long thesis title " * 30
     @rows["projects"].first["submitted_at"] = "2026-01-01T12:34:56Z"
     sync
@@ -138,11 +139,29 @@ class Rams::ImportWorkflowTest < ActiveSupport::TestCase
 
   test "names alone never merge source identities" do
     @rows["projects"].last["applicant"] = { "id" => 28, "full_name" => "Researcher", "orcid" => nil }
+    @rows["team_memberships"] << @rows["team_memberships"].first.merge("id" => 28, "project" => { "id" => 34 }, "user" => @rows["projects"].last["applicant"])
     sync
     assert_equal 2, Person.count
     assert_equal [ "Researcher" ], Person.distinct.pluck(:name)
     people = SourceIdentifier.where(record_type: "Person", external_id: %w[27 28]).pluck(:record_id)
     assert_equal 2, people.uniq.size
+  end
+
+  test "new stations use corrected coordinates while archives retain the source value" do
+    @station.destroy!
+    result = sync
+    assert_equal "-122.149444", Station.sole.longitude.to_s("F")
+    saved = JSON.parse(File.read(result.fetch(:evidence).fetch(:snapshot)))
+    assert_equal 122.149444, saved.fetch("reserves").fetch("data").sole.fetch("longitude")
+  end
+
+  test "unlinked owners and applicants remain in the archive without creating people" do
+    @rows["projects"].last["applicant"] = { "id" => 28, "full_name" => "Unlinked applicant", "orcid" => nil }
+    result = sync
+    assert_equal 1, Person.count
+    assert_not SourceIdentifier.exists?(record_type: "Person", external_id: "28")
+    saved = JSON.parse(File.read(result.fetch(:evidence).fetch(:snapshot)))
+    assert_equal 28, saved.fetch("projects").fetch("data").last.fetch("applicant").fetch("id")
   end
 
   test "empty projects and missing selected reserves stop before any writes" do
