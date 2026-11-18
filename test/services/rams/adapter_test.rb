@@ -35,6 +35,29 @@ class Rams::AdapterTest < ActiveSupport::TestCase
     @rows["projects"].each { |row| row["reserve"]["id"] = 3 }
     assert_equal "Another reserve", translate.stations.sole.attributes[:name]
     assert_equal [ 3 ], translate.activities.first.station_ids
+    assert_equal 122.149444, translate.stations.sole.attributes[:longitude]
+  end
+
+  test "corrects only the known UC Nature Quail Ridge longitude without changing source data" do
+    assert_equal "-122.14944444", translate.stations.sole.attributes[:longitude]
+    assert_equal 122.149444, @rows["reserves"].sole.fetch("longitude")
+    @rows["reserves"].sole["longitude"] = -122.15
+    assert_equal(-122.15, translate.stations.sole.attributes[:longitude])
+  end
+
+  test "another installation retains its directory coordinates" do
+    connection = SourceConnection.load(:ucnature).with(source: { source_system: "rams", source_instance: "another" })
+    @adapter = Rams::Adapter.new(connection: connection, reserve_id: 27)
+    assert_equal 122.149444, translate.stations.sole.attributes[:longitude]
+  end
+
+  test "owners and applicants without selected memberships are not emitted as people" do
+    @rows["projects"].first["owner"] = { "id" => 100, "full_name" => "Owner", "orcid" => nil }
+    @rows["projects"].first["applicant"] = { "id" => 101, "full_name" => "Applicant", "orcid" => nil }
+    assert_equal [ 27 ], translate.people.map(&:external_id)
+    @rows["team_memberships"] = []
+    assert_empty translate.people
+    assert_empty translate.memberships
   end
 
   test "memberships and their people outside selected projects are excluded" do

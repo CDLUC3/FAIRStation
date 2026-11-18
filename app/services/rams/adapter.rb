@@ -40,7 +40,12 @@ module Rams
     def station(collections)
       row = rows(collections, "reserves").find { |candidate| candidate.fetch("id") == reserve_id }
       raise Error, "Selected reserve #{reserve_id} is absent from source data" unless row
-      Imports::Batch::StationInput.new(external_id: reserve_id, attributes: row.slice(*STATION_FIELDS).symbolize_keys)
+      attributes = row.slice(*STATION_FIELDS).symbolize_keys
+      # UC Nature's directory has a known sign error for Quail Ridge; see db/seeds.rb.
+      if source[:source_instance] == "ucnature" && reserve_id == 27 && attributes[:longitude].to_s == "122.149444"
+        attributes[:longitude] = "-122.14944444"
+      end
+      Imports::Batch::StationInput.new(external_id: reserve_id, attributes: attributes)
     end
 
     def rows(collections, resource) = collections.fetch(resource).fetch("data")
@@ -51,8 +56,10 @@ module Rams
     end
 
     def users(collections)
+      membership_users = memberships(collections).filter_map { |row| row["user"] }
+      user_ids = membership_users.pluck("id").to_set
       project_users = rows(collections, "projects").flat_map { |row| row.values_at("owner", "applicant") }
-      assertions = (project_users + memberships(collections).map { |row| row["user"] }).compact
+      assertions = project_users.compact.select { |row| user_ids.include?(row.fetch("id")) } + membership_users
       assertions.group_by { |row| row.fetch("id") }.values.map { |rows| user_assertion(rows) }
     end
 
