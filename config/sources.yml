@@ -1,0 +1,8 @@
+shared:
+  ucnature:
+    adapter: rams
+    base_url: https://rams.ucnature.org/api/v1/
+    source:
+      source_system: rams
+      source_instance: ucnature
+    credential_path: [rams, api_token]
