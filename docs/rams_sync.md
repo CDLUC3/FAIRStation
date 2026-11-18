@@ -33,8 +33,8 @@ not yet a persisted, per-record provenance history.
   visits and activity/station attribution need agreement before use.
 - Person association by supplied ORCID is a separate draft identity policy.
 - Whether this development task should be retained needs Danny's clarification.
-- Detailed diagnostics are a separate draft layer. This import does not require
-  a full comparison report to commit; it does require its source archive.
+- Detailed comparison tooling is deferred. The import requires its source
+  archive, but does not require a separate comparison report to commit.
 
 Tests use synthetic collections. No production counts, record identifiers,
 source snapshots, or run findings belong in repository documentation.
