@@ -19,6 +19,10 @@ module Imports
       raise
     end
 
+    def write_report(paths, report)
+      write_json(paths.fetch(:report), report)
+    end
+
     private
 
     def write_json(path, value)

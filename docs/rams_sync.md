@@ -38,3 +38,28 @@ not yet a persisted, per-record provenance history.
 
 Tests use synthetic collections. No production counts, record identifiers,
 source snapshots, or run findings belong in repository documentation.
+
+## Optional read-only diagnostics
+
+After an import, run `bin/rails 'rams:validate[ucnature,27]'` to retrieve fresh
+source data and compare samples with the existing local database. This command
+performs no domain writes. It archives that retrieval and a restricted local
+JSON report; report failures remove only that diagnostic run's incomplete files.
+They cannot roll back an earlier import or prevent a normal `rams:sync` run.
+
+The report includes counts, station differences preserved, unmapped nested JSON
+field paths, excluded memberships, unmodeled relationships, and visits whose
+projects are outside the selected project collection. A leaf is a final nested
+value such as `institution.name`. An unmapped field is not invalid source data.
+Three current and five historical projects are sampled where available; missing
+samples are counted. Sample detail responses are rechecked against the collection.
+Field comparisons show incoming and stored values, accounting for normalization.
+Nested person discrepancies are reported; top-level mapped project mismatches
+stop the diagnostic run. These are spot checks using the same mapping as the
+adapter, not independent proof that every mapping or imported record is correct.
+
+Here, evidence means source assertions, retrieval metadata, and import diagnostic
+material. It does not prove attendance or a relationship to a research output.
+The report references its source archive rather than duplicating the full input.
+Keep reports and production findings outside version control. The precise
+retention policy and future persisted provenance model remain review decisions.

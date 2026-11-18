@@ -14,4 +14,17 @@ namespace :rams do
     puts "Imported records: #{result.fetch(:imported)}"
     puts "Local source archive: #{result.fetch(:evidence)}"
   end
+
+  desc "Compare retrieved RAMS data with an existing local import; write diagnostics without database changes"
+  task :validate, [ :connection, :reserve_id ] => :environment do |_, args|
+    abort "RAMS diagnostics run only in FAIR Station development" unless Rails.env.development?
+    abort "Usage: bin/rails 'rams:validate[connection,reserve_id]'" if args[:connection].blank? || args[:reserve_id].blank?
+
+    connection = SourceConnection.load(args[:connection])
+    adapter = Rams::Adapter.new(connection: connection, reserve_id: args[:reserve_id])
+    client = Rams::Client.new(token: connection.credential, base_url: connection.base_url)
+    report = Rams::ValidationRun.new(adapter: adapter, client: client).call
+    puts "Diagnostic report: #{report.fetch(:evidence).fetch(:report)}"
+    puts "Project sample shortfall: #{report.fetch(:sample_shortfall)}"
+  end
 end
