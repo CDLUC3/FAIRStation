@@ -11,8 +11,9 @@ Learn more at [fairstation.org](https://fairstation.org).
 ## Application baseline
 
 The application currently serves a public landing page at `/` and a deployment
-liveness check at `/up`. Research review, source integrations, and sign-in are
-not implemented; the research model and identity provider remain undecided.
+liveness check at `/up`. A draft development RAMS import exercises the initial
+research models. Research review and sign-in are not implemented; the broader
+model and identity provider remain undecided.
 
 The stack is Ruby **4.0.6**, Rails **8.1.4.1** (locked in `Gemfile.lock`), Puma,
 MySQL **8.4**, ERB, Hotwire (Turbo and Stimulus), importmap, and Propshaft. MySQL
@@ -93,6 +94,13 @@ check that `/assets/` requests succeed with no JavaScript errors.
 `window.Turbo` and `window.Stimulus` should be available in the browser console.
 `/up` checks that Rails boots; it does **not** certify database connectivity,
 RAMS availability, or readiness of future integrations.
+
+## RAMS imports (draft)
+
+The development-only `bin/rails 'rams:sync[ucnature,27]'` command retrieves RAMS
+data and imports common research inputs. See the [runbook](docs/rams_sync.md)
+for credentials, local source archiving, and unresolved scope/identity decisions.
+This draft workflow is not yet approved for production use.
 
 ## Configuration and secrets
 
