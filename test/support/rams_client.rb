@@ -14,6 +14,9 @@ class RamsTestClient
 
   def record(resource, id)
     @transaction_depths << ApplicationRecord.connection.open_transactions
-    @rows.fetch(resource).find { |row| row.fetch("id") == id }.deep_dup
+    @requests << [ "#{resource}/#{id}", {} ]
+    row = @rows.fetch(resource).find { |candidate| candidate.fetch("id") == id }
+    raise Rams::Error, "RAMS HTTP 404 for #{resource}/#{id}" unless row
+    row.deep_dup
   end
 end

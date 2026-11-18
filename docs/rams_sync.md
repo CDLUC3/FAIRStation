@@ -5,9 +5,13 @@ connection and Quail Ridge reserve. The task refuses other Rails environments.
 Store the token in Rails encrypted credentials at the path configured in
 `config/sources.yml`.
 
-The adapter retrieves all pages of reserves, projects, memberships, visits,
-funding and institutions. Projects, visits and funding use the selected reserve
-filter; other collections follow token visibility. It verifies scope and then
+The adapter retrieves all pages of reserves, memberships, visits, funding and
+institutions. Visits and funding use the selected reserve filter. It then fetches
+each distinct project referenced by those visits through the project detail API;
+assigned reserve and reserve interest do not determine selection or attribution.
+Other collections follow token visibility. Inaccessible or missing visit-linked
+projects stop the run before writes; a token must be permitted to retrieve them.
+A reserve without visits can complete an empty sync. It verifies scope and then
 translates the collections before any database transaction. The importer saves
 stations, people, activities and memberships atomically; visits, institutions,
 funding and owner/applicant relationships remain unmodeled. Reruns refresh mapped
@@ -26,17 +30,18 @@ and their source URL, identity namespace, selected reserve, and retrieval time
 under ignored `tmp/source-imports/run-*`. Files are mode 0600 inside a mode-0700
 run directory. Archive-write failures prevent import; database failures remove
 that run's archive. A process crash may leave orphan files, so their presence
-alone does not prove database commit. This is local provenance/debugging support,
-not yet a persisted, per-record provenance history.
+alone does not prove database commit. The transaction also persists an `ImportRun`
+receipt with retrieval and successful-sync times, absolute evidence paths and
+SHA-256 checksums. Each processed source identifier links to that receipt. Failed
+imports roll back the receipt and preserve the previous successful-sync timestamp.
+Receipts identify local evidence; they do not back it up or provide per-field history.
+See `docs/source_imports.md` for the freshness query and provenance boundaries.
 
 ## Open review decisions
 
-- RAMS permits reserve-independent projects and cross-reserve visits. The current
-  selected-project query uses the optional project reserve; inclusion through
-  visits and activity/station attribution need agreement before use.
 - Source IDs establish person identity. Conflicting ORCID assertions stop the
   import; reviewed linking of different source identities remains undecided.
-- Whether this development task should be retained needs Danny's clarification.
+- Test-data and summary retention still need clarification.
 - Detailed comparison tooling is deferred. The import requires its source
   archive, but does not require a separate comparison report to commit.
 

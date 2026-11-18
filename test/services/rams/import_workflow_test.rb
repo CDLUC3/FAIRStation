@@ -75,6 +75,7 @@ class Rams::ImportWorkflowTest < ActiveSupport::TestCase
     small = count_selects { sync }
     originals = @rows.fetch("projects").deep_dup
     @rows["projects"] += (100..155).map { |id| originals.first.merge("id" => id, "title" => "Project #{id}") }
+    @rows["visits"] += (100..155).map { |id| @rows["visits"].first.merge("id" => id, "project" => { "id" => id }) }
     sync
     large = count_selects { sync }
     assert_operator small, :<, 20
@@ -124,8 +125,10 @@ class Rams::ImportWorkflowTest < ActiveSupport::TestCase
     counts = [ Station.count, ResearchActivity.count, Person.count, ActivityPerson.count, SourceIdentifier.count ]
     sync
     assert_equal counts, [ Station.count, ResearchActivity.count, Person.count, ActivityPerson.count, SourceIdentifier.count ]
-    assert_equal %w[reserves projects team_memberships visits fundings institutions], @client.requests.first(6).map(&:first)
+    assert_equal %w[reserves visits], @client.requests.first(2).map(&:first)
     assert_equal({ reserve_id: 27 }, @client.requests[1].last)
+    assert_equal (27..34).map { |id| "projects/#{id}" }, @client.requests.map(&:first).grep(%r{projects/}).first(8)
+    assert_not @client.requests.any? { |resource, _| resource == "projects" }
   end
 
   test "an asserted ORCID collision stops the import and removes its archive" do
@@ -171,7 +174,7 @@ class Rams::ImportWorkflowTest < ActiveSupport::TestCase
     assert_empty ResearchActivity.all
     @rows["reserves"] = [ { "id" => 3, "name" => "Other reserve" } ]
     assert_raises(Rams::Error) { sync }
-    assert_equal 1, @client.requests.count { |resource, _| resource == "projects" }
+    assert_equal 1, @client.requests.count { |resource, _| resource == "projects/27" }
   end
 
   test "discovers metadata and excludes other reserves and their memberships" do
@@ -220,18 +223,51 @@ class Rams::ImportWorkflowTest < ActiveSupport::TestCase
     assert_equal [ 2, 9, 2, 2 ], [ Station.count, ResearchActivity.count, Person.count, ActivityPerson.count ]
   end
 
-  test "out of scope projects stop before writes" do
-    @rows["projects"].first["reserve"]["id"] = 900
+  test "visit-linked projects can have no assigned reserve or belong elsewhere" do
+    @rows["projects"][0]["reserve"] = nil
+    @rows["projects"][1]["reserve"] = { "id" => 900 }
+    @rows["projects"] << @rows["projects"].last.merge("id" => 999)
+    sync
+    assert_equal 8, ResearchActivity.count
+    assert_equal [ @station.id ], ActivityStation.distinct.pluck(:station_id)
+    assert_not SourceIdentifier.exists?(record_type: "ResearchActivity", external_id: "999")
+  end
+
+  test "inaccessible visit-linked projects stop before writes or archives" do
+    @rows["visits"].first["project"]["id"] = 900
     assert_raises(Rams::Error) { sync }
+    assert_empty ResearchActivity.all
+    assert_empty ImportRun.all
+    assert_empty Dir.children(@evidence_directory)
+  end
+
+  test "out of scope visits stop before fetching projects" do
+    @rows["visits"].first["reserve"]["id"] = 3
+    assert_raises(Rams::Error) { sync }
+    assert_not @client.requests.any? { |resource, _| resource.start_with?("projects/") }
     assert_empty ResearchActivity.all
   end
 
-  test "visits use their own reserve scope even when their project is outside the pull" do
-    @rows["visits"].first["project"]["id"] = 900
+  test "a shared project keeps both station links across repeated syncs" do
     sync
+    @adapter = Rams::Adapter.new(connection: @connection, reserve_id: 3)
+    @rows["reserves"] << @rows["reserves"].first.merge("id" => 3, "name" => "Second station")
+    @rows["visits"].each { |row| row["reserve"]["id"] = 3 }
+    @rows["fundings"] = []
+    2.times { sync }
     assert_equal 8, ResearchActivity.count
-    @rows["visits"].first["reserve"]["id"] = 3
-    assert_raises(Rams::Error) { sync }
+    assert_equal 2, Station.count
+    assert_equal 16, ActivityStation.count
+    assert_equal 1, Person.count
+    assert_equal 1, ActivityPerson.count
+  end
+
+  test "a station with no visits completes an empty sync" do
+    @rows["visits"] = []
+    result = sync
+    assert_empty ResearchActivity.all
+    assert_equal 0, result.fetch(:imported).fetch("ResearchActivity")
+    assert_equal 1, ImportRun.count
   end
 
   test "conflicting ORCIDs roll back the entire import" do
@@ -242,11 +278,44 @@ class Rams::ImportWorkflowTest < ActiveSupport::TestCase
     assert_equal "Earlier", person.reload.name
   end
 
+  test "successful sync receipts link records to verifiable evidence and advance freshness" do
+    travel_to Time.utc(2026, 11, 18, 12) do
+      first = sync
+      receipt = ImportRun.find(first.fetch(:import_run_id))
+      assert_equal Time.current, receipt.successful_at
+      assert_equal Time.current, receipt.retrieved_at
+      assert_equal Digest::SHA256.file(receipt.snapshot_path).hexdigest, receipt.snapshot_sha256
+      assert_equal Digest::SHA256.file(receipt.metadata_path).hexdigest, receipt.metadata_sha256
+      assert_equal [ receipt.id ], SourceIdentifier.distinct.pluck(:import_run_id)
+      travel 1.hour
+      second = sync
+      assert_equal Time.current, ImportRun.last_successful_sync(source: @adapter.source, station_external_id: 27)
+      assert_equal [ second.fetch(:import_run_id) ], SourceIdentifier.distinct.pluck(:import_run_id)
+      assert_equal 2, ImportRun.count
+      assert File.exist?(receipt.snapshot_path)
+      assert_nil ImportRun.last_successful_sync(source: @adapter.source, station_external_id: 3)
+    end
+  end
+
+  test "failed repeat sync preserves last successful receipt and archive" do
+    first = sync
+    receipt = ImportRun.find(first.fetch(:import_run_id))
+    @rows["team_memberships"].first["active"] = nil
+    assert_raises(ActiveRecord::RecordInvalid) { sync }
+    assert_equal [ receipt.id ], ImportRun.pluck(:id)
+    assert_equal [ receipt.id ], SourceIdentifier.distinct.pluck(:import_run_id)
+    assert_equal receipt.successful_at, ImportRun.last_successful_sync(source: @adapter.source, station_external_id: 27)
+    assert_equal 1, Dir.children(@evidence_directory).size
+    assert File.exist?(receipt.snapshot_path)
+  end
+
   test "a late failure rolls back all imported records" do
     @rows["team_memberships"].first["active"] = nil
     assert_raises(ActiveRecord::RecordInvalid) { sync }
     assert_empty ResearchActivity.all
     assert_empty Person.all
     assert_empty ActivityPerson.all
+    assert_empty ImportRun.all
+    assert_empty Dir.children(@evidence_directory)
   end
 end

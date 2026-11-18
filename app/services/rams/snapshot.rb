@@ -6,13 +6,21 @@ module Rams
     def self.pull(client:, adapter:)
       reserves = client.collection("reserves")
       verify_reserve!(reserves.fetch("data"), adapter)
-      projects = client.collection("projects", reserve_id: adapter.reserve_id)
-      raise Error, "RAMS has no projects for reserve #{adapter.reserve_id}; stopped" if projects.fetch("data").empty?
+      visits = client.collection("visits", reserve_id: adapter.reserve_id)
+      visits.fetch("data").each do |row|
+        raise Error, "Out-of-scope visits record #{row['id']}" unless row.dig("reserve", "id") == adapter.reserve_id
+      end
+      ids = visits.fetch("data").map { |row| row.fetch("project").fetch("id") }.uniq
+      projects = ids.map do |id|
+        client.record("projects", id).tap do |row|
+          raise Error, "RAMS returned the wrong project for #{id}" unless row.fetch("id") == id
+        end
+      end
 
       new(adapter: adapter, collections: {
-        "reserves" => reserves, "projects" => projects,
+        "reserves" => reserves, "projects" => { "data" => projects, "total_count" => projects.size },
         "team_memberships" => client.collection("team_memberships"),
-        "visits" => client.collection("visits", reserve_id: adapter.reserve_id),
+        "visits" => visits,
         "fundings" => client.collection("fundings", reserve_id: adapter.reserve_id),
         "institutions" => client.collection("institutions")
       })
@@ -57,7 +65,8 @@ module Rams
     def project_ids = @project_ids ||= rows("projects").pluck("id").to_set
 
     def verify_projects!
-      rows("projects").each { |row| verify_reserve_link!(row, "projects") }
+      visit_projects = rows("visits").map { |row| row.fetch("project").fetch("id") }.to_set
+      raise Error, "Visit-linked project selection is incomplete" unless project_ids == visit_projects
     end
 
     def verify_visits!
@@ -67,17 +76,12 @@ module Rams
 
     def verify_fundings!
       rows("fundings").each do |row|
-        verify_project_link!(row, "fundings")
         verify_reserve_link!(row, "fundings")
       end
     end
 
     def verify_reserve_link!(row, resource)
       raise Error, "Out-of-scope #{resource} record #{row['id']}" unless row.dig("reserve", "id") == adapter.reserve_id
-    end
-
-    def verify_project_link!(row, resource)
-      raise Error, "Out-of-scope #{resource} record #{row['id']}" unless project_ids.include?(row.dig("project", "id"))
     end
   end
 end
