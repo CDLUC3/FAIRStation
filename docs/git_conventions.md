@@ -33,7 +33,12 @@ Types: feat, fix, chore, docs, refactor, test, release
 ## Pull requests
 
 Titles use the `<type>(scope)!: description` format as commits, because a squash
-merge turns the title into the commit subject. All pull requests target `main`.
+merge turns the title into the commit subject. Pull requests target `main`, or
+temporarily target another open PR branch in this repository when splitting
+dependent work for review. Every dependency chain must end at `main`; cycles
+and missing or foreign-repository parents fail CI. Keep work-in-progress layers
+as drafts. Review and merge from the bottom of the stack, then rebase each
+dependent branch and retarget its PR to `main` before merging.
 
 ```
 feat(import): build a research activity from RAMS data
