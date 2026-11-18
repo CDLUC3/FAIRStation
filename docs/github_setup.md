@@ -6,7 +6,7 @@
    CI jobs before protection can require them.
 2. Have a repository administrator run `bin/configure-github --apply`. Preview
    first; the apply step refuses a non-admin account before changing anything.
-3. Add the `RELEASE_PLEASE_TOKEN` secret described below.
+3. Configure the release GitHub App credentials described below.
 4. Merge a releasable PR and review the resulting release PR.
 
 AWS deployment is not part of this setup yet. See #31 and
@@ -27,24 +27,31 @@ Title edits rerun the check.
 
 ## Release token
 
-Release Please needs a token that can open a PR whose CI runs. A token scoped to
-one repository is enough:
+Release Please uses a short-lived GitHub App installation token so its release
+PRs can trigger CI without depending on a personal access token.
 
-1. Create a fine-grained PAT for the repository with **Contents**, **Issues**,
-   and **Pull requests** read/write.
-2. Store it as the Actions secret `RELEASE_PLEASE_TOKEN`.
-3. Keep the expiry visible. When it lapses, release PRs stop opening until it is
-   replaced.
+1. Register a GitHub App with **Contents**, **Issues**, and **Pull requests**
+   read/write repository permissions. Webhooks and user authorization are not
+   needed. For a personally owned pilot app installed on this organization,
+   select **Any account** as the installation option.
+2. Install the app on the organization with access limited to FAIRStation.
+   Organization approval may be required.
+3. In repository **Settings → Secrets and variables → Actions**, add the app's
+   client ID as the repository variable `RELEASE_APP_CLIENT_ID`.
+4. Generate an app private key and store the complete PEM contents as the
+   repository Actions secret `RELEASE_APP_PRIVATE_KEY`.
 
-The current `RELEASE_PLEASE_TOKEN` was created on 2026-10-21 with a 366-day
-expiry, so it expires on **2027-10-22**. Update this note whenever the token is
-rotated.
+The release workflow generates a token scoped to the current repository with
+the three write permissions above. The token action revokes it when the job
+finishes. Never commit the private key or put it in Rails credentials; the app
+runtime still needs only `RAILS_MASTER_KEY`.
 
-Do not use `GITHUB_TOKEN`: pull requests and releases it creates do not trigger
-other workflows. `RELEASE_PLEASE_TOKEN` is a CI secret, not an application
-secret; the app runtime still needs only `RAILS_MASTER_KEY`. Do not put it in
-Rails credentials: the release workflow must not receive the production master
-key.
+Keep the existing `RELEASE_PLEASE_TOKEN` secret during the pilot so reverting
+the workflow restores PAT authentication. Remove it after confirming that the
+app can create or update release PRs, their CI runs, and a planned release
+publishes successfully. If the PAT serves other workflows or repositories,
+check those consumers before revoking it. Transfer the pilot app to the
+organization after verification.
 
 ## Routine release
 
