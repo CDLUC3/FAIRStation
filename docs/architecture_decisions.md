@@ -6,7 +6,7 @@ deferred; nothing here claims a deployed environment.
 
 ## Application
 
-- **Ruby 4.0.10, Rails 8.1, server-rendered ERB, Hotwire, importmap, Propshaft.**
+- **Ruby 4.0.9, Rails 8.1, server-rendered ERB, Hotwire, importmap, Propshaft.**
   Keep one Rails application; no separate frontend build or runtime.
 - **MySQL 8.4 in every environment.** Development, test, CI, and the deployed
   RDS instance run the same engine, so SQL mode, collation, and column behavior
