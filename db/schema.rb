@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_11_18_213810) do
+ActiveRecord::Schema[8.1].define(version: 2026_11_19_212928) do
   create_table "activity_people", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
     t.bigint "research_activity_id", null: false
     t.bigint "person_id", null: false
@@ -19,6 +19,9 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_18_213810) do
     t.boolean "is_principal_investigator", default: false, null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.string "affiliation_source_id"
+    t.string "affiliation_name"
+    t.string "affiliation_ror_id"
     t.index ["person_id"], name: "index_activity_people_on_person_id"
     t.index ["research_activity_id", "person_id"], name: "index_activity_people_on_research_activity_id_and_person_id", unique: true
     t.index ["research_activity_id"], name: "index_activity_people_on_research_activity_id"

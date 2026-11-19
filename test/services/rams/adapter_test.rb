@@ -26,7 +26,10 @@ class Rams::AdapterTest < ActiveSupport::TestCase
     assert_equal({ name: "Researcher", orcid: "0000-0002-1825-0097" }, batch.people.sole.attributes)
     assert_equal 27, batch.memberships.sole.activity_id
     assert_equal 27, batch.memberships.sole.person_id
-    assert_equal({ role: "graduate_student", active: false, is_principal_investigator: true }, batch.memberships.sole.attributes)
+    assert_equal({
+      role: "graduate_student", active: false, is_principal_investigator: true,
+      affiliation_source_id: "2", affiliation_name: "University", affiliation_ror_id: "https://ror.org/example"
+    }, batch.memberships.sole.attributes)
   end
 
   test "another reserve uses the same mappings and directory metadata" do

@@ -32,11 +32,12 @@ module Rams
     end
 
     def translate(collections:)
+      institutions = rows(collections, "institutions").index_by { |row| row.fetch("id") }
       Imports::Batch.new(source: source,
         stations: [ station(collections) ],
         people: users(collections).map { |row| Imports::Batch::PersonInput.new(external_id: row.fetch("id"), attributes: { name: row.fetch("full_name"), orcid: row.fetch("orcid") }) },
         activities: projects(collections).map { |row| activity(row) },
-        memberships: memberships(collections).map { |row| membership(row) })
+        memberships: memberships(collections).map { |row| membership(row, institutions) })
     end
 
     private
@@ -83,10 +84,18 @@ module Rams
       Imports::Batch::ActivityInput.new(external_id: row.fetch("id"), attributes: attributes, station_ids: [ reserve_id ])
     end
 
-    def membership(row)
+    def membership(row, institutions)
       raise Error, "Membership #{row['id']} has no user" unless row["user"]
+      institution_id = row.dig("institution", "id")
       Imports::Batch::MembershipInput.new(external_id: row.fetch("id"),
-        attributes: { role: row.fetch("user_role"), active: row.fetch("active"), is_principal_investigator: row.fetch("is_principal_investigator") },
+        attributes: {
+          role: row.fetch("user_role"),
+          active: row.fetch("active"),
+          is_principal_investigator: row.fetch("is_principal_investigator"),
+          affiliation_source_id: institution_id&.to_s,
+          affiliation_name: row.dig("institution", "name"),
+          affiliation_ror_id: institutions.dig(institution_id, "ror", "ror_id")
+        },
         activity_id: row.fetch("project").fetch("id"), person_id: row.fetch("user").fetch("id"))
     end
   end
