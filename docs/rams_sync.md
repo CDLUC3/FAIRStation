@@ -13,9 +13,13 @@ Other collections follow token visibility. Inaccessible or missing visit-linked
 projects stop the run before writes; a token must be permitted to retrieve them.
 A reserve without visits can complete an empty sync. It verifies scope and then
 translates the collections before any database transaction. The importer saves
-stations, people, activities and memberships atomically; visits, institutions,
-funding and owner/applicant relationships remain unmodeled. Reruns refresh mapped
-fields without duplicating source identities. Removals remain outside this slice.
+stations, people, activities and memberships atomically. Each membership retains
+the institution ID and name asserted by RAMS, plus its ROR ID when available in
+the retrieved institution directory. The affiliation describes that project
+membership. A membership without an institution imports with empty affiliation
+fields. Visits, funding and owner/applicant relationships remain unmodeled.
+Reruns refresh mapped fields without duplicating source identities. Removals
+remain outside this slice.
 The imported-record summary counts distinct records processed by the current
 batch, including existing records on reruns, rather than installation-wide
 totals or only newly created records.
