@@ -40,15 +40,18 @@ module Imports
     def import_activity(row)
       stations = row.station_ids.map { |id| @records.fetch(Station, id) }
       existing = @records.find(ResearchActivity, row.external_id)
-      attributes = row.attributes
       activity = if existing
-        existing.update!(attributes)
-        stations.each { |station| existing.stations << station unless existing.stations.include?(station) }
-        existing
+        refresh_activity(existing, row.attributes, stations)
       else
-        ResearchActivity.create!(**attributes, stations: stations)
+        ResearchActivity.create!(**row.attributes, stations: stations)
       end
       @records.identify(activity, row.external_id)
+    end
+
+    def refresh_activity(activity, attributes, stations)
+      activity.update!(attributes)
+      stations.each { |station| activity.stations << station unless activity.stations.include?(station) }
+      activity
     end
 
     def import_memberships
@@ -68,13 +71,17 @@ module Imports
       attributes = rows.map(&:attributes).uniq
       raise Error, "Conflicting incoming memberships for activity #{rows.first.activity_id}" unless attributes.one?
       activity_id, person_id = key
+      existing = identified_membership(rows, key) || links[[ *key, attributes.sole[:role] ]]
+      membership = persist(ActivityPerson, existing, attributes.sole.merge(research_activity_id: activity_id, person_id: person_id))
+      rows.each { |row| @records.identify(membership, row.external_id) }
+    end
+
+    def identified_membership(rows, key)
       identified = rows.filter_map { |row| @records.find(ActivityPerson, row.external_id) }.uniq
       if identified.many? || identified.any? { |link| [ link.research_activity_id, link.person_id ] != key }
         raise Error, "Membership identity conflict for activity #{rows.first.activity_id}"
       end
-      existing = identified.first || links[[ *key, attributes.sole[:role] ]]
-      membership = persist(ActivityPerson, existing, attributes.sole.merge(research_activity_id: activity_id, person_id: person_id))
-      rows.each { |row| @records.identify(membership, row.external_id) }
+      identified.first
     end
 
     def import_assignment(row)

@@ -1,17 +1,8 @@
 require "test_helper"
+require_relative "../../support/import_batches"
 
 class Imports::BatchImportTest < ActiveSupport::TestCase
-  def batch(instance: "installation-a", station_id: "station-a", title: "Translated activity")
-    Imports::Batch.new(source: { source_system: "another_source", source_instance: instance },
-      stations: [ Imports::Batch::StationInput.new(external_id: station_id, attributes: { name: "Translated station" }) ],
-      people: [ Imports::Batch::PersonInput.new(external_id: "person-a", attributes: { name: "Translated person", orcid: nil }) ],
-      activities: [ Imports::Batch::ActivityInput.new(external_id: "activity-a", attributes: { title: title, activity_type: "research", status: "open" }, station_ids: [ station_id ]) ],
-      memberships: [ Imports::Batch::MembershipInput.new(external_id: "membership-a", attributes: { role: "researcher", active: true, is_principal_investigator: false }, activity_id: "activity-a", person_id: "person-a") ])
-  end
-
-  def import(batch)
-    ApplicationRecord.transaction { Imports::BatchImport.new(batch: batch).call }
-  end
+  include ImportBatches
 
   test "imports translated records from another source and safely refreshes reruns" do
     import(batch)
@@ -67,45 +58,6 @@ class Imports::BatchImportTest < ActiveSupport::TestCase
     assert_empty Person.all
     assert_empty ResearchActivity.all
     assert_empty SourceIdentifier.all
-  end
-  test "an asserted ORCID cannot link a new source identity to an existing person" do
-    existing = Person.create!(name: "Earlier name", orcid: "0000-0002-1825-0097")
-    input = batch.people.sole.with(attributes: { name: "Current source name", orcid: "https://orcid.org/0000-0002-1825-0097" })
-    assert_raises(Imports::Error) { import(batch.with(people: [ input ])) }
-    assert_equal 1, Person.count
-    assert_equal "Earlier name", existing.reload.name
-    assert_empty SourceIdentifier.all
-    assert_empty Station.all
-    assert_empty ResearchActivity.all
-  end
-
-  test "two source identities asserting the same ORCID fail atomically" do
-    first = batch.people.sole.with(attributes: { name: "Same person", orcid: "0000-0002-1825-0097" })
-    second = first.with(external_id: "person-b")
-    assert_raises(Imports::Error) { import(batch.with(people: [ first, second ])) }
-    assert_empty Person.all
-    assert_empty SourceIdentifier.all
-    assert_empty Station.all
-  end
-
-  test "a known source identity can refresh attributes without an ORCID merge" do
-    input = batch.people.sole.with(attributes: { name: "Earlier name", orcid: "0000-0002-1825-0097" })
-    import(batch.with(people: [ input ]))
-    person = Person.sole
-    refreshed = input.with(attributes: { name: "Current source name", orcid: "https://orcid.org/0000-0002-1825-0097" })
-    import(batch.with(people: [ refreshed ]))
-    assert_equal person, Person.sole
-    assert_equal "Current source name", person.reload.name
-    assert_equal 1, person.source_identifiers.count
-  end
-
-  test "contradictory ORCID and source identities fail atomically" do
-    input = batch.people.sole.with(attributes: { name: "Person", orcid: "0000-0002-1825-0097" })
-    import(batch.with(people: [ input ]))
-    conflicting = input.with(attributes: { name: "Changed", orcid: "0000-0001-2345-6789" })
-    assert_raises(Imports::Error) { import(batch.with(people: [ conflicting ])) }
-    assert_equal "Person", Person.sole.name
-    assert_equal "0000-0002-1825-0097", Person.sole.orcid
   end
 
   test "curated station attributes are preserved on reruns" do

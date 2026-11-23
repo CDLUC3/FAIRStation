@@ -4,14 +4,16 @@ class Rams::ClientTest < ActiveSupport::TestCase
   def client_for(responses, resource: "projects")
     @requests = []
     @stubs = Faraday::Adapter::Test::Stubs.new
-    responses.each do |response|
-      @stubs.get("/api/v1/#{resource}") do |env|
-        @requests << env
-        raise "Unexpected HTTP request" if @requests.size > responses.size
-        response.respond_to?(:call) ? response.call : response
-      end
-    end
+    responses.each { |response| stub_page(resource, response, responses.size) }
     Rams::Client.new(token: "test-secret", base_url: "https://rams.example/api/v1/", adapter: [ :test, @stubs ])
+  end
+
+  def stub_page(resource, response, request_limit)
+    @stubs.get("/api/v1/#{resource}") do |env|
+      @requests << env
+      raise "Unexpected HTTP request" if @requests.size > request_limit
+      response.respond_to?(:call) ? response.call : response
+    end
   end
 
   def page(number, ids, total: 2)
