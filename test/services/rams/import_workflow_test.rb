@@ -21,17 +21,21 @@ class Rams::ImportWorkflowTest < ActiveSupport::TestCase
     Imports::Sync.new(adapter: @adapter, client: @client, archive: archive).call
   end
 
+  def team_membership
+    SourceIdentifier.find_by!(**@connection.source, record_type: "ActivityPerson", external_id: "27").record
+  end
+
   test "shared identity memberships can change roles together on a later run" do
     other = @rows.fetch("team_memberships").first.deep_dup
     other["id"] = 28
     @rows.fetch("team_memberships") << other
     result = sync
-    assert_equal 1, ActivityPerson.count
-    assert_equal 1, result.fetch(:imported).fetch("ActivityPerson")
+    assert_equal 9, ActivityPerson.count
+    assert_equal 9, result.fetch(:imported).fetch("ActivityPerson")
     @rows.fetch("team_memberships").each { |row| row["user_role"] = "postdoc" }
     sync
-    assert_equal "postdoc", ActivityPerson.sole.role
-    assert_equal 2, ActivityPerson.sole.source_identifiers.count
+    assert_equal "postdoc", team_membership.role
+    assert_equal 2, team_membership.source_identifiers.count
   end
 
   test "conflicting incoming memberships roll back without changing the existing role" do
@@ -41,8 +45,8 @@ class Rams::ImportWorkflowTest < ActiveSupport::TestCase
     other["user_role"] = "postdoc"
     @rows.fetch("team_memberships") << other
     assert_raises(Imports::Error) { sync }
-    assert_equal "graduate_student", ActivityPerson.sole.role
-    assert_equal 1, ActivityPerson.sole.source_identifiers.count
+    assert_equal "graduate_student", team_membership.role
+    assert_equal 1, team_membership.source_identifiers.count
   end
 
   test "snapshot write failure prevents import" do
@@ -58,7 +62,7 @@ class Rams::ImportWorkflowTest < ActiveSupport::TestCase
     institution = first["institution"]
     first["institution"] = nil
     sync
-    existing = ActivityPerson.sole
+    existing = team_membership
     assert_nil existing.affiliation_source_id
     assert_nil existing.affiliation_name
     assert_nil existing.affiliation_ror_id
@@ -70,7 +74,7 @@ class Rams::ImportWorkflowTest < ActiveSupport::TestCase
     result = sync
 
     assert_equal 1, Person.count
-    assert_equal 2, existing.person.activity_people.count
+    assert_equal 10, existing.person.activity_people.count
     assert_equal "2", existing.reload.affiliation_source_id
     assert_equal "University", existing.affiliation_name
     assert_equal "https://ror.org/example", existing.affiliation_ror_id
@@ -91,7 +95,7 @@ class Rams::ImportWorkflowTest < ActiveSupport::TestCase
 
     error = assert_raises(Imports::Error) { sync }
     assert_match(/Conflicting incoming memberships/, error.message)
-    membership = ActivityPerson.sole
+    membership = team_membership
     assert_equal "2", membership.affiliation_source_id
     assert_equal result.fetch(:import_run_id), membership.source_identifiers.sole.import_run_id
     assert_equal result.fetch(:import_run_id), ImportRun.sole.id
@@ -159,7 +163,7 @@ class Rams::ImportWorkflowTest < ActiveSupport::TestCase
     assert_equal "Long thesis title " * 30, activity.thesis_title
     assert_equal Time.utc(2026, 1, 1, 12, 34, 56), activity.submitted_at
     assert_equal [ @station ], activity.stations.to_a
-    membership = activity.activity_people.sole
+    membership = team_membership
     assert_equal "graduate_student", membership.role
     assert_not membership.active
     assert membership.is_principal_investigator
@@ -187,7 +191,6 @@ class Rams::ImportWorkflowTest < ActiveSupport::TestCase
 
   test "names alone never merge source identities" do
     @rows["projects"].last["applicant"] = { "id" => 28, "full_name" => "Researcher", "orcid" => nil }
-    @rows["team_memberships"] << @rows["team_memberships"].first.merge("id" => 28, "project" => { "id" => 34 }, "user" => @rows["projects"].last["applicant"])
     sync
     assert_equal 2, Person.count
     assert_equal [ "Researcher" ], Person.distinct.pluck(:name)
@@ -203,13 +206,35 @@ class Rams::ImportWorkflowTest < ActiveSupport::TestCase
     assert_equal 122.149444, saved.fetch("reserves").fetch("data").sole.fetch("longitude")
   end
 
-  test "unlinked owners and applicants remain in the archive without creating people" do
-    @rows["projects"].last["applicant"] = { "id" => 28, "full_name" => "Unlinked applicant", "orcid" => nil }
+  test "rerunning sync backfills both project roles for a user without a team membership" do
+    @rows["projects"].each { |project| project["owner"] = nil }
+    sync
+    membership = team_membership
+    assert_equal 1, ActivityPerson.count
+
+    project = @rows["projects"].first
+    user = { "id" => 28, "full_name" => "Researcher", "orcid" => nil }
+    project.merge!("owner" => user, "applicant" => user)
     result = sync
-    assert_equal 1, Person.count
-    assert_not SourceIdentifier.exists?(record_type: "Person", external_id: "28")
-    saved = JSON.parse(File.read(result.fetch(:evidence).fetch(:snapshot)))
-    assert_equal 28, saved.fetch("projects").fetch("data").last.fetch("applicant").fetch("id")
+
+    person = SourceIdentifier.find_by!(**@connection.source, record_type: "Person", external_id: "28").record
+    roles = membership.research_activity.activity_people.where(person: person).order(:role)
+    assert_equal %w[applicant owner], roles.pluck(:role)
+    assert_equal 3, result.fetch(:imported).fetch("ActivityPerson")
+    assert_equal membership.id, team_membership.id
+    assert_not_equal membership.person, person
+    link_ids = roles.pluck(:id)
+    assert_no_difference [ "ActivityPerson.count", "Person.count", "SourceIdentifier.count" ] do
+      sync
+    end
+    assert_equal link_ids, roles.pluck(:id)
+
+    project["owner"] = @rows["team_memberships"].sole.fetch("user")
+    assert_no_difference "ActivityPerson.count" do
+      sync
+    end
+    assert_equal membership.person_id, ActivityPerson.find(link_ids.last).person_id
+    assert_equal person.id, ActivityPerson.find(link_ids.first).person_id
   end
 
   test "empty projects and missing selected reserves stop before any writes" do
@@ -232,7 +257,7 @@ class Rams::ImportWorkflowTest < ActiveSupport::TestCase
     sync
     assert_equal 1, Station.count
     assert_equal 1, Person.count
-    assert_equal 1, ActivityPerson.count
+    assert_equal 9, ActivityPerson.count
     assert_equal "Quail Ridge Reserve", @station.reload.name
   end
 
@@ -251,7 +276,7 @@ class Rams::ImportWorkflowTest < ActiveSupport::TestCase
 
   test "imported counts include only distinct records processed by this run" do
     first = sync
-    assert_equal({ "Station" => 1, "ResearchActivity" => 8, "Person" => 1, "ActivityPerson" => 1 }, first.fetch(:imported))
+    assert_equal({ "Station" => 1, "ResearchActivity" => 8, "Person" => 1, "ActivityPerson" => 9 }, first.fetch(:imported))
     @adapter = Rams::Adapter.new(connection: @connection, reserve_id: 3)
     @rows["reserves"].sole.merge!("id" => 3, "name" => "Another reserve")
     user = { "id" => 900, "full_name" => "Another researcher", "orcid" => nil }
@@ -260,11 +285,11 @@ class Rams::ImportWorkflowTest < ActiveSupport::TestCase
     %w[visits fundings].each do |resource|
       @rows[resource].each { |row| row.merge!("reserve" => { "id" => 3 }, "project" => { "id" => 900 }) }
     end
-    expected = { "Station" => 1, "ResearchActivity" => 1, "Person" => 1, "ActivityPerson" => 1 }
+    expected = { "Station" => 1, "ResearchActivity" => 1, "Person" => 1, "ActivityPerson" => 2 }
     assert_equal expected, sync.fetch(:imported)
-    assert_equal [ 2, 9, 2, 2 ], [ Station.count, ResearchActivity.count, Person.count, ActivityPerson.count ]
+    assert_equal [ 2, 9, 2, 11 ], [ Station.count, ResearchActivity.count, Person.count, ActivityPerson.count ]
     assert_equal expected, sync.fetch(:imported)
-    assert_equal [ 2, 9, 2, 2 ], [ Station.count, ResearchActivity.count, Person.count, ActivityPerson.count ]
+    assert_equal [ 2, 9, 2, 11 ], [ Station.count, ResearchActivity.count, Person.count, ActivityPerson.count ]
   end
 
   test "visit-linked projects can have no assigned reserve or belong elsewhere" do
@@ -303,7 +328,7 @@ class Rams::ImportWorkflowTest < ActiveSupport::TestCase
     assert_equal 2, Station.count
     assert_equal 16, ActivityStation.count
     assert_equal 1, Person.count
-    assert_equal 1, ActivityPerson.count
+    assert_equal 9, ActivityPerson.count
   end
 
   test "a station with no visits completes an empty sync" do

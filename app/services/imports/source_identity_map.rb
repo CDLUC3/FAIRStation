@@ -23,7 +23,7 @@ module Imports
 
     def counts(batch:)
       { Station => batch.stations, ResearchActivity => batch.activities,
-        Person => batch.people, ActivityPerson => batch.memberships }.to_h do |type, rows|
+        Person => batch.people, ActivityPerson => batch.memberships + batch.activity_roles }.to_h do |type, rows|
         records = rows.map { |row| fetch(type, row.external_id).id }
         [ type.name, records.uniq.size ]
       end
