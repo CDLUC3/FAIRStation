@@ -1,8 +1,12 @@
+inherit_from: .rubocop_todo.yml
+
 # Omakase Ruby styling for Rails
 inherit_gem: { rubocop-rails-omakase: rubocop.yml }
 
-# Overwrite or add rules to create your own house style
-#
-# # Use `[a, [b, c]]` not `[ a, [ b, c ] ]`
-# Layout/SpaceInsideArrayLiteralBrackets:
-#   Enabled: false
+Metrics/MethodLength:
+  Enabled: true
+  Max: 8
+
+Metrics/ClassLength:
+  Enabled: true
+  Max: 100
