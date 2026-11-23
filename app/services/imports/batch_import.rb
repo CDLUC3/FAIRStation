@@ -39,15 +39,18 @@ module Imports
     def import_activity(row)
       stations = row.station_ids.map { |id| @records.fetch(Station, id) }
       existing = @records.find(ResearchActivity, row.external_id)
-      attributes = row.attributes
       activity = if existing
-        existing.update!(attributes)
-        stations.each { |station| existing.stations << station unless existing.stations.include?(station) }
-        existing
+        update_activity(existing, row.attributes, stations)
       else
-        ResearchActivity.create!(**attributes, stations: stations)
+        ResearchActivity.create!(**row.attributes, stations: stations)
       end
       @records.identify(activity, row.external_id)
+    end
+
+    def update_activity(activity, attributes, stations)
+      activity.update!(attributes)
+      stations.each { |station| activity.stations << station unless activity.stations.include?(station) }
+      activity
     end
 
     def import_memberships

@@ -4,32 +4,7 @@ module Rams
     attr_reader :collections, :adapter, :retrieved_at
 
     def self.pull(client:, adapter:)
-      reserves = client.collection("reserves")
-      verify_reserve!(reserves.fetch("data"), adapter)
-      visits = client.collection("visits", reserve_id: adapter.reserve_id)
-      visits.fetch("data").each do |row|
-        raise Error, "Out-of-scope visits record #{row['id']}" unless row.dig("reserve", "id") == adapter.reserve_id
-      end
-      ids = visits.fetch("data").map { |row| row.fetch("project").fetch("id") }.uniq
-      projects = ids.map do |id|
-        client.record("projects", id).tap do |row|
-          raise Error, "RAMS returned the wrong project for #{id}" unless row.fetch("id") == id
-        end
-      end
-
-      new(adapter: adapter, collections: {
-        "reserves" => reserves, "projects" => { "data" => projects, "total_count" => projects.size },
-        "team_memberships" => client.collection("team_memberships"),
-        "visits" => visits,
-        "fundings" => client.collection("fundings", reserve_id: adapter.reserve_id),
-        "institutions" => client.collection("institutions")
-      })
-    end
-
-    def self.verify_reserve!(reserves, adapter)
-      unless reserves.one? { |row| row.fetch("id") == adapter.reserve_id }
-        raise Error, "Selected reserve #{adapter.reserve_id} is not visible in the RAMS directory; stopped"
-      end
+      new(adapter: adapter, collections: SnapshotPull.new(client: client, adapter: adapter).collections)
     end
 
     def initialize(collections:, adapter:, retrieved_at: Time.current.iso8601)

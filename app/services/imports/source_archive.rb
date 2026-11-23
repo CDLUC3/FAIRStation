@@ -10,16 +10,20 @@ module Imports
     def capture(snapshot)
       FileUtils.mkdir_p(@directory, mode: 0o700)
       directory = Dir.mktmpdir("run-", @directory)
-      paths = { snapshot: File.join(directory, "snapshot.json"), metadata: File.join(directory, "retrieval.json") }
-      write_json(paths.fetch(:snapshot), snapshot.collections)
-      write_json(paths.fetch(:metadata), snapshot.metadata)
-      yield paths
+      yield write_snapshot(directory, snapshot)
     rescue StandardError
       FileUtils.remove_entry(directory) if directory && File.exist?(directory)
       raise
     end
 
     private
+
+    def write_snapshot(directory, snapshot)
+      paths = { snapshot: File.join(directory, "snapshot.json"), metadata: File.join(directory, "retrieval.json") }
+      write_json(paths.fetch(:snapshot), snapshot.collections)
+      write_json(paths.fetch(:metadata), snapshot.metadata)
+      paths
+    end
 
     def write_json(path, value)
       File.open(path, File::WRONLY | File::CREAT | File::EXCL, 0o600) do |file|
