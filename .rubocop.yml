@@ -3,22 +3,6 @@ inherit_from: .rubocop_todo.yml
 # Omakase Ruby styling for Rails
 inherit_gem: { rubocop-rails-omakase: rubocop.yml }
 
-inherit_mode:
-  merge:
-    - Exclude
-
-AllCops:
-  Exclude:
-    # Migrations already present when the length limits were introduced.
-    - db/migrate/20261105152108_create_stations.rb
-    - db/migrate/20261105152111_create_source_identifiers.rb
-    - db/migrate/20261106185013_add_source_instance_to_source_identifiers.rb
-    - db/migrate/20261109161315_create_research_activity_models.rb
-    - db/migrate/20261110185543_allow_missing_orcid_and_scope_source_identity_by_record_type.rb
-    - db/migrate/20261113010221_expand_research_activity_thesis_title.rb
-    - db/migrate/20261118213810_create_import_runs.rb
-    - db/migrate/20261119212928_add_affiliation_to_activity_people.rb
-
 Metrics/MethodLength:
   Enabled: true
   Max: 8

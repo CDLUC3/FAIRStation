@@ -13,7 +13,7 @@ Metrics/ClassLength:
     - 'test/services/imports/batch_import_test.rb'
     - 'test/services/rams/import_workflow_test.rb'
 
-# Offense count: 7
+# Offense count: 10
 # Configuration parameters: CountComments, Max, CountAsOne, AllowedMethods, AllowedPatterns.
 Metrics/MethodLength:
   Exclude:
@@ -22,5 +22,8 @@ Metrics/MethodLength:
     - 'app/services/imports/sync.rb'
     - 'app/services/rams/adapter.rb'
     - 'app/services/rams/snapshot.rb'
+    - 'db/migrate/20261105152108_create_stations.rb'
+    - 'db/migrate/20261109161315_create_research_activity_models.rb'
+    - 'db/migrate/20261118213810_create_import_runs.rb'
     - 'test/clients/rams/client_test.rb'
     - 'test/support/rams_collections.rb'
