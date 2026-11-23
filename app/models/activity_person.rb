@@ -1,6 +1,4 @@
 class ActivityPerson < ApplicationRecord
-  PROJECT_ROLES = %w[owner applicant].freeze
-
   belongs_to :research_activity
   belongs_to :person
   has_many :source_identifiers, as: :record, dependent: :destroy, inverse_of: :record

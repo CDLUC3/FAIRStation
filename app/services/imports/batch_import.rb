@@ -16,7 +16,7 @@ module Imports
       @batch.people.each { |row| import_person(row) }
       @batch.activities.each { |row| import_activity(row) }
       import_memberships
-      @batch.activity_roles.each { |row| import_activity_role(row) }
+      @batch.assignments.each { |row| import_assignment(row) }
       # Read persisted values back in batches for validation.
       SourceIdentityMap.new(source: @batch.source)
     end
@@ -53,11 +53,10 @@ module Imports
 
     def import_memberships
       activities = @batch.activities.map { |row| @records.fetch(ResearchActivity, row.external_id).id }
-      memberships = ActivityPerson.where(research_activity_id: activities)
-        .reject { |membership| membership.role.in?(ActivityPerson::PROJECT_ROLES) }
-        .index_by { |membership| [ membership.research_activity_id, membership.person_id ] }
+      links = ActivityPerson.where(research_activity_id: activities)
+        .index_by { |link| [ link.research_activity_id, link.person_id, link.role ] }
       incoming = @batch.memberships.group_by { |row| activity_person_key(row) }
-      incoming.each { |key, rows| import_membership(rows, memberships[key]) }
+      incoming.each { |key, rows| import_membership(rows, key, links) }
     end
 
     def activity_person_key(row)
@@ -65,27 +64,24 @@ module Imports
         @records.fetch(Person, row.person_id).id ]
     end
 
-    def import_membership(rows, existing)
+    def import_membership(rows, key, links)
       attributes = rows.map(&:attributes).uniq
       raise Error, "Conflicting incoming memberships for activity #{rows.first.activity_id}" unless attributes.one?
-      activity_id, person_id = activity_person_key(rows.first)
-      rows.each { |row| verify_membership_identity!(row, activity_id, person_id) }
+      activity_id, person_id = key
+      identified = rows.filter_map { |row| @records.find(ActivityPerson, row.external_id) }.uniq
+      if identified.many? || identified.any? { |link| [ link.research_activity_id, link.person_id ] != key }
+        raise Error, "Membership identity conflict for activity #{rows.first.activity_id}"
+      end
+      existing = identified.first || links[[ *key, attributes.sole[:role] ]]
       membership = persist(ActivityPerson, existing, attributes.sole.merge(research_activity_id: activity_id, person_id: person_id))
       rows.each { |row| @records.identify(membership, row.external_id) }
     end
 
-    def verify_membership_identity!(row, activity_id, person_id)
-      existing = @records.find(ActivityPerson, row.external_id)
-      if existing && [ existing.research_activity_id, existing.person_id ] != [ activity_id, person_id ]
-        raise Error, "Membership identity conflict for #{row.external_id}"
-      end
-    end
-
-    def import_activity_role(row)
+    def import_assignment(row)
       activity_id, person_id = activity_person_key(row)
       existing = @records.find(ActivityPerson, row.external_id)
       if existing && [ existing.research_activity_id, existing.role ] != [ activity_id, row.role ]
-        raise Error, "Activity role identity conflict for #{row.external_id}"
+        raise Error, "Assignment identity conflict for #{row.external_id}"
       end
       link = persist(ActivityPerson, existing, research_activity_id: activity_id, person_id: person_id, role: row.role)
       @records.identify(link, row.external_id)

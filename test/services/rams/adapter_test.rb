@@ -62,7 +62,7 @@ class Rams::AdapterTest < ActiveSupport::TestCase
     batch = translate
     assert_equal [ 27, 100, 101 ], batch.people.map(&:external_id).sort
     assert_empty batch.memberships
-    assert_equal({ "owner" => 100, "applicant" => 101 }, batch.activity_roles.select { |link| link.activity_id == 27 }.to_h { |link| [ link.role, link.person_id ] })
+    assert_equal({ "owner" => 100, "applicant" => 101 }, batch.assignments.select { |link| link.activity_id == 27 }.to_h { |link| [ link.role, link.person_id ] })
   end
 
   test "memberships and their people outside selected projects are excluded" do
@@ -95,7 +95,7 @@ class Rams::AdapterTest < ActiveSupport::TestCase
     batch = translate
     assert_empty batch.activities
     assert_empty batch.memberships
-    assert_empty batch.activity_roles
+    assert_empty batch.assignments
     assert_empty batch.people
   end
 

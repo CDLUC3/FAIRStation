@@ -18,6 +18,7 @@ module Rams
       "submitted_at" => :submitted_at
     }.freeze
     STATION_FIELDS = %w[name short_name description doi latitude longitude].freeze
+    PROJECT_ROLES = %w[owner applicant].freeze
     attr_reader :connection, :reserve_id
 
     def initialize(connection:, reserve_id:)
@@ -37,10 +38,10 @@ module Rams
       selected_memberships = memberships(collections, selected_projects)
       Imports::Batch.new(source: source,
         stations: [ station(collections) ],
-        people: users(selected_projects, selected_memberships).map { |row| Imports::Batch::PersonInput.new(external_id: row.fetch("id"), attributes: { name: row.fetch("full_name"), orcid: row.fetch("orcid") }) },
+        people: users(selected_projects, selected_memberships).map { |row| person(row) },
         activities: selected_projects.map { |row| activity(row) },
         memberships: selected_memberships.map { |row| membership(row, institutions) },
-        activity_roles: selected_projects.flat_map { |row| activity_roles(row) })
+        assignments: selected_projects.flat_map { |row| project_assignments(row) })
     end
 
     private
@@ -70,7 +71,7 @@ module Rams
 
     def users(projects, memberships)
       membership_users = memberships.filter_map { |row| row["user"] }
-      project_users = projects.flat_map { |row| row.values_at(*ActivityPerson::PROJECT_ROLES).compact }
+      project_users = projects.flat_map { |row| row.values_at(*PROJECT_ROLES).compact }
       assertions = project_users + membership_users
       assertions.group_by { |row| row.fetch("id") }.values.map { |rows| user_assertion(rows) }
     end
@@ -81,17 +82,22 @@ module Rams
       rows.last.merge("orcid" => orcids.first)
     end
 
+    def person(row)
+      Imports::Batch::PersonInput.new(external_id: row.fetch("id"),
+        attributes: { name: row.fetch("full_name"), orcid: row.fetch("orcid") })
+    end
+
     def activity(row)
       attributes = PROJECT_FIELDS.to_h { |source, target| [ target, row.fetch(source) ] }
       Imports::Batch::ActivityInput.new(external_id: row.fetch("id"), attributes: attributes, station_ids: [ reserve_id ])
     end
 
-    def activity_roles(row)
+    def project_assignments(row)
       project_id = row.fetch("id")
-      ActivityPerson::PROJECT_ROLES.filter_map do |role|
+      PROJECT_ROLES.filter_map do |role|
         next unless user = row[role]
 
-        Imports::Batch::ActivityRoleInput.new(external_id: "project/#{project_id}/#{role}",
+        Imports::Batch::AssignmentInput.new(external_id: "project/#{project_id}/#{role}",
           role: role, activity_id: project_id, person_id: user.fetch("id"))
       end
     end

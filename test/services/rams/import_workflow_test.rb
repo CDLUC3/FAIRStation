@@ -210,31 +210,48 @@ class Rams::ImportWorkflowTest < ActiveSupport::TestCase
     @rows["projects"].each { |project| project["owner"] = nil }
     sync
     membership = team_membership
-    assert_equal 1, ActivityPerson.count
 
-    project = @rows["projects"].first
     user = { "id" => 28, "full_name" => "Researcher", "orcid" => nil }
-    project.merge!("owner" => user, "applicant" => user)
-    result = sync
+    @rows["projects"].first.merge!("owner" => user, "applicant" => user)
+    result = nil
+    assert_difference "ActivityPerson.count", 2 do
+      result = sync
+    end
 
     person = SourceIdentifier.find_by!(**@connection.source, record_type: "Person", external_id: "28").record
-    roles = membership.research_activity.activity_people.where(person: person).order(:role)
-    assert_equal %w[applicant owner], roles.pluck(:role)
+    assert_equal %w[applicant owner], membership.research_activity.activity_people.where(person: person).order(:role).pluck(:role)
     assert_equal 3, result.fetch(:imported).fetch("ActivityPerson")
     assert_equal membership.id, team_membership.id
     assert_not_equal membership.person, person
-    link_ids = roles.pluck(:id)
+  end
+
+  test "unchanged project roles keep their links across reruns" do
+    project = @rows["projects"].first
+    project["applicant"] = project.fetch("owner")
+    sync
+    links = team_membership.research_activity.activity_people
+    first_run = links.order(:id).pluck(:id, :person_id, :role)
+
     assert_no_difference [ "ActivityPerson.count", "Person.count", "SourceIdentifier.count" ] do
       sync
     end
-    assert_equal link_ids, roles.pluck(:id)
+    assert_equal first_run, links.order(:id).pluck(:id, :person_id, :role)
+  end
 
-    project["owner"] = @rows["team_memberships"].sole.fetch("user")
-    assert_no_difference "ActivityPerson.count" do
-      sync
-    end
-    assert_equal membership.person_id, ActivityPerson.find(link_ids.last).person_id
-    assert_equal person.id, ActivityPerson.find(link_ids.first).person_id
+  test "reassigning a project owner updates the same link and preserves the applicant" do
+    project = @rows["projects"].first
+    project["applicant"] = project.fetch("owner")
+    sync
+    links = team_membership.research_activity.activity_people
+    owner = links.find_by!(role: "owner")
+    applicant = links.find_by!(role: "applicant")
+
+    project["owner"] = { "id" => 28, "full_name" => "New owner", "orcid" => nil }
+    assert_no_difference("ActivityPerson.count") { sync }
+
+    person = SourceIdentifier.find_by!(**@connection.source, record_type: "Person", external_id: "28").record
+    assert_equal person, owner.reload.person
+    assert_equal team_membership.person, applicant.reload.person
   end
 
   test "empty projects and missing selected reserves stop before any writes" do
