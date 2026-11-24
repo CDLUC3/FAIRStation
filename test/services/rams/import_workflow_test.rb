@@ -31,7 +31,7 @@ class Rams::ImportWorkflowTest < ActiveSupport::TestCase
     assert_equal "Long thesis title " * 30, activity.thesis_title
     assert_equal Time.utc(2026, 1, 1, 12, 34, 56), activity.submitted_at
     assert_equal [ @station ], activity.stations.to_a
-    membership = activity.activity_people.sole
+    membership = team_membership
     assert_equal "graduate_student", membership.role
     assert_not membership.active
     assert membership.is_principal_investigator
@@ -49,7 +49,7 @@ class Rams::ImportWorkflowTest < ActiveSupport::TestCase
 
   test "imported counts include only distinct records processed by this run" do
     first = sync
-    assert_equal({ "Station" => 1, "ResearchActivity" => 8, "Person" => 1, "ActivityPerson" => 1 }, first.fetch(:imported))
+    assert_equal({ "Station" => 1, "ResearchActivity" => 8, "Person" => 1, "ActivityPerson" => 9 }, first.fetch(:imported))
     @adapter = Rams::Adapter.new(connection: @connection, reserve_id: 3)
     @rows["reserves"].sole.merge!("id" => 3, "name" => "Another reserve")
     user = { "id" => 900, "full_name" => "Another researcher", "orcid" => nil }
@@ -58,11 +58,11 @@ class Rams::ImportWorkflowTest < ActiveSupport::TestCase
     %w[visits fundings].each do |resource|
       @rows[resource].each { |row| row.merge!("reserve" => { "id" => 3 }, "project" => { "id" => 900 }) }
     end
-    expected = { "Station" => 1, "ResearchActivity" => 1, "Person" => 1, "ActivityPerson" => 1 }
+    expected = { "Station" => 1, "ResearchActivity" => 1, "Person" => 1, "ActivityPerson" => 2 }
     assert_equal expected, sync.fetch(:imported)
-    assert_equal [ 2, 9, 2, 2 ], [ Station.count, ResearchActivity.count, Person.count, ActivityPerson.count ]
+    assert_equal [ 2, 9, 2, 11 ], [ Station.count, ResearchActivity.count, Person.count, ActivityPerson.count ]
     assert_equal expected, sync.fetch(:imported)
-    assert_equal [ 2, 9, 2, 2 ], [ Station.count, ResearchActivity.count, Person.count, ActivityPerson.count ]
+    assert_equal [ 2, 9, 2, 11 ], [ Station.count, ResearchActivity.count, Person.count, ActivityPerson.count ]
   end
 
   private

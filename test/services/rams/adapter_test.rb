@@ -54,13 +54,15 @@ class Rams::AdapterTest < ActiveSupport::TestCase
     assert_equal 122.149444, translate.stations.sole.attributes[:longitude]
   end
 
-  test "owners and applicants without selected memberships are not emitted as people" do
+  test "owners and applicants are emitted even without selected memberships" do
     @rows["projects"].first["owner"] = { "id" => 100, "full_name" => "Owner", "orcid" => nil }
     @rows["projects"].first["applicant"] = { "id" => 101, "full_name" => "Applicant", "orcid" => nil }
-    assert_equal [ 27 ], translate.people.map(&:external_id)
+    assert_equal [ 27, 100, 101 ], translate.people.map(&:external_id).sort
     @rows["team_memberships"] = []
-    assert_empty translate.people
-    assert_empty translate.memberships
+    batch = translate
+    assert_equal [ 27, 100, 101 ], batch.people.map(&:external_id).sort
+    assert_empty batch.memberships
+    assert_equal({ "owner" => 100, "applicant" => 101 }, batch.assignments.select { |link| link.activity_id == 27 }.to_h { |link| [ link.role, link.person_id ] })
   end
 
   test "memberships and their people outside selected projects are excluded" do
@@ -93,6 +95,7 @@ class Rams::AdapterTest < ActiveSupport::TestCase
     batch = translate
     assert_empty batch.activities
     assert_empty batch.memberships
+    assert_empty batch.assignments
     assert_empty batch.people
   end
 

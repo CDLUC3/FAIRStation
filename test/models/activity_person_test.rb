@@ -33,6 +33,18 @@ class ActivityPersonTest < ActiveSupport::TestCase
     end
   end
 
+  test "allows multiple roles while preventing duplicate roles" do
+    attributes = { research_activity_id: @activity.id, person_id: @person.id }
+    %w[owner applicant graduate_student].each { |role| ActivityPerson.create!(**attributes, role: role) }
+
+    assert_equal [ @person ], @activity.people.to_a
+    assert_equal [ @activity ], @person.research_activities.to_a
+    assert_not ActivityPerson.new(**attributes, role: "owner").valid?
+    assert_raises(ActiveRecord::RecordNotUnique) do
+      ActivityPerson.insert_all!([ attributes.merge(role: "owner") ])
+    end
+  end
+
   test "destroying a person removes memberships but preserves activities" do
     @activity.activity_people.create!(person: @person)
     @person.destroy!

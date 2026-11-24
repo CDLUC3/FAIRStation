@@ -18,6 +18,7 @@ module Rams
       "submitted_at" => :submitted_at
     }.freeze
     STATION_FIELDS = %w[name short_name description doi latitude longitude].freeze
+    PROJECT_ROLES = %w[owner applicant].freeze
     attr_reader :connection, :reserve_id
 
     def initialize(connection:, reserve_id:)
@@ -38,7 +39,8 @@ module Rams
       Imports::Batch.new(source: source, stations: [ station(collections) ],
         people: users(selected_projects, selected_memberships).map { |row| person(row) },
         activities: selected_projects.map { |row| activity(row) },
-        memberships: selected_memberships.map { |row| membership(row, institutions) })
+        memberships: selected_memberships.map { |row| membership(row, institutions) },
+        assignments: selected_projects.flat_map { |row| project_assignments(row) })
     end
 
     private
@@ -68,9 +70,8 @@ module Rams
 
     def users(projects, memberships)
       membership_users = memberships.filter_map { |row| row["user"] }
-      user_ids = membership_users.pluck("id").to_set
-      project_users = projects.flat_map { |row| row.values_at("owner", "applicant") }
-      assertions = project_users.compact.select { |row| user_ids.include?(row.fetch("id")) } + membership_users
+      project_users = projects.flat_map { |row| row.values_at(*PROJECT_ROLES).compact }
+      assertions = project_users + membership_users
       assertions.group_by { |row| row.fetch("id") }.values.map { |rows| user_assertion(rows) }
     end
 
@@ -88,6 +89,16 @@ module Rams
     def activity(row)
       attributes = PROJECT_FIELDS.to_h { |source, target| [ target, row.fetch(source) ] }
       Imports::Batch::ActivityInput.new(external_id: row.fetch("id"), attributes: attributes, station_ids: [ reserve_id ])
+    end
+
+    def project_assignments(row)
+      project_id = row.fetch("id")
+      PROJECT_ROLES.filter_map do |role|
+        next unless user = row[role]
+
+        Imports::Batch::AssignmentInput.new(external_id: "project/#{project_id}/#{role}",
+          role: role, activity_id: project_id, person_id: user.fetch("id"))
+      end
     end
 
     def membership(row, institutions)

@@ -9,12 +9,47 @@ class Rams::ProjectMembershipTest < ActiveSupport::TestCase
     other["id"] = 28
     @rows.fetch("team_memberships") << other
     result = sync
-    assert_equal 1, ActivityPerson.count
-    assert_equal 1, result.fetch(:imported).fetch("ActivityPerson")
+    assert_equal 9, ActivityPerson.count
+    assert_equal 9, result.fetch(:imported).fetch("ActivityPerson")
     @rows.fetch("team_memberships").each { |row| row["user_role"] = "postdoc" }
     sync
-    assert_equal "postdoc", ActivityPerson.sole.role
-    assert_equal 2, ActivityPerson.sole.source_identifiers.count
+    assert_equal "postdoc", team_membership.role
+    assert_equal 2, team_membership.source_identifiers.count
+  end
+
+  test "a shared membership can change roles without changing the project assignment" do
+    input = @rows["team_memberships"].sole
+    input["user_role"] = "owner"
+    sync
+    assignment_link = team_membership
+
+    input["user_role"] = "postdoc"
+    @rows["projects"].first["owner"] = nil
+    assert_difference "ActivityPerson.count", 1 do
+      sync
+    end
+
+    assignment = SourceIdentifier.find_by!(**@connection.source, record_type: "ActivityPerson", external_id: "project/27/owner")
+    assert_equal assignment_link, assignment.record
+    assert_equal "owner", assignment_link.reload.role
+    assert_equal "postdoc", team_membership.role
+    assert_equal assignment_link.person, team_membership.person
+    assert_equal [ true, false, nil, nil, nil ], membership_details(assignment_link)
+    assert_equal [ false, true, "2", "University", "https://ror.org/example" ], membership_details(team_membership)
+  end
+
+  test "an assignment keeps its membership details while another membership still identifies it" do
+    input = @rows["team_memberships"].sole
+    input["user_role"] = "owner"
+    other = input.merge("id" => 28)
+    @rows["team_memberships"] << other
+    sync
+    shared_link = team_membership
+
+    @rows["team_memberships"] = [ input.merge("user_role" => "postdoc") ]
+    sync
+
+    assert_equal [ false, true, "2", "University", "https://ror.org/example" ], membership_details(shared_link.reload)
   end
 
   test "conflicting incoming memberships roll back without changing the existing role" do
@@ -24,8 +59,8 @@ class Rams::ProjectMembershipTest < ActiveSupport::TestCase
     other["user_role"] = "postdoc"
     @rows.fetch("team_memberships") << other
     assert_raises(Imports::Error) { sync }
-    assert_equal "graduate_student", ActivityPerson.sole.role
-    assert_equal 1, ActivityPerson.sole.source_identifiers.count
+    assert_equal "graduate_student", team_membership.role
+    assert_equal 1, team_membership.source_identifiers.count
   end
 
   test "a rerun stores the reported affiliation on each project membership" do
@@ -33,7 +68,7 @@ class Rams::ProjectMembershipTest < ActiveSupport::TestCase
     institution = first["institution"]
     first["institution"] = nil
     sync
-    existing = ActivityPerson.sole
+    existing = team_membership
     assert_nil existing.affiliation_source_id
     assert_nil existing.affiliation_name
     assert_nil existing.affiliation_ror_id
@@ -45,7 +80,7 @@ class Rams::ProjectMembershipTest < ActiveSupport::TestCase
     result = sync
 
     assert_equal 1, Person.count
-    assert_equal 2, existing.person.activity_people.count
+    assert_equal 10, existing.person.activity_people.count
     assert_equal "2", existing.reload.affiliation_source_id
     assert_equal "University", existing.affiliation_name
     assert_equal "https://ror.org/example", existing.affiliation_ror_id
@@ -66,9 +101,15 @@ class Rams::ProjectMembershipTest < ActiveSupport::TestCase
 
     error = assert_raises(Imports::Error) { sync }
     assert_match(/Conflicting incoming memberships/, error.message)
-    membership = ActivityPerson.sole
+    membership = team_membership
     assert_equal "2", membership.affiliation_source_id
     assert_equal result.fetch(:import_run_id), membership.source_identifiers.sole.import_run_id
     assert_equal result.fetch(:import_run_id), ImportRun.sole.id
+  end
+
+  private
+
+  def membership_details(link)
+    [ link.active, link.is_principal_investigator, link.affiliation_source_id, link.affiliation_name, link.affiliation_ror_id ]
   end
 end
