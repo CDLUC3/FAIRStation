@@ -88,6 +88,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_23_184522) do
     t.datetime "updated_at", null: false
     t.string "source_instance", limit: 128, null: false
     t.bigint "import_run_id"
+    t.boolean "activity_person_assignment", default: false, null: false
     t.index ["import_run_id"], name: "index_source_identifiers_on_import_run_id"
     t.index ["record_type", "record_id"], name: "index_source_identifiers_on_record"
     t.index ["source_system", "source_instance", "record_type", "external_id"], name: "index_source_identifiers_on_source_identity", unique: true

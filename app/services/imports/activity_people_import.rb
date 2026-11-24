@@ -44,16 +44,16 @@ module Imports
       if existing && [ existing.research_activity_id, existing.role ] != [ key.first, row.role ]
         raise Error, "Assignment identity conflict for #{row.external_id}"
       end
-      persist_link(existing, [ row.external_id ], key, { role: row.role })
+      persist_link(existing, [ row.external_id ], key, { role: row.role }, assignment: true)
     end
 
-    def persist_link(existing, ids, person_key, attributes)
+    def persist_link(existing, ids, person_key, attributes, assignment: false)
       key = [ *person_key, attributes.fetch(:role) { existing&.role } ]
       link = link_to_update(existing, key, ids)
       link.assign_attributes(attributes.merge(research_activity_id: key[0], person_id: key[1]))
       link.save! if link.new_record? || link.has_changes_to_save?
       move_identities(existing, link, ids) if existing && existing != link
-      ids.each { |id| @records.identify(link, id) }
+      ids.each { |id| @records.identify(link, id, assignment: assignment) }
       @links[key] = link
     end
 
@@ -69,10 +69,17 @@ module Imports
     def move_identities(existing, link, ids)
       moved = ids.select { |id| @records.find(ActivityPerson, id) == existing }
       @records.move_activity_person_identities(from: existing, to: link, external_ids: moved)
-      return if existing.source_identifiers.exists?
+      refresh_previous_link(existing)
+    end
 
-      @links.delete(link_key(existing))
-      existing.destroy!
+    def refresh_previous_link(link)
+      assignment_flags = link.source_identifiers.pluck(:activity_person_assignment)
+      if assignment_flags.empty?
+        @links.delete(link_key(link))
+        link.destroy!
+      elsif assignment_flags.all?
+        link.reset_membership_details!
+      end
     end
 
     def other_identities?(link, ids)

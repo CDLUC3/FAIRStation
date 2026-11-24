@@ -13,10 +13,13 @@ module Imports
       find(type, id) || raise(Error, "Missing #{type.name} for source ID #{id}")
     end
 
-    def identify(record, id)
+    def identify(record, id, assignment: false)
       existing = @identifiers[key(record.class.name, id)]
       raise Error, "Source identity conflict" if existing && existing.record != record
-      identifier = @identifiers[key(record.class.name, id)] ||= SourceIdentifier.create!(**@source, external_id: id.to_s, record: record)
+      identifier = @identifiers[key(record.class.name, id)] ||= SourceIdentifier.create!(
+        **@source, external_id: id.to_s, record: record, activity_person_assignment: assignment
+      )
+      identifier.update!(activity_person_assignment: true) if assignment && !identifier.activity_person_assignment?
       identifier.update_columns(import_run_id: @import_run.id, updated_at: Time.current) if @import_run && identifier.import_run_id != @import_run.id
       record
     end

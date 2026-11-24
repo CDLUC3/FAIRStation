@@ -24,6 +24,7 @@ class Rams::ProjectMembershipTest < ActiveSupport::TestCase
     assignment_link = team_membership
 
     input["user_role"] = "postdoc"
+    @rows["projects"].first["owner"] = nil
     assert_difference "ActivityPerson.count", 1 do
       sync
     end
@@ -33,6 +34,22 @@ class Rams::ProjectMembershipTest < ActiveSupport::TestCase
     assert_equal "owner", assignment_link.reload.role
     assert_equal "postdoc", team_membership.role
     assert_equal assignment_link.person, team_membership.person
+    assert_equal [ true, false, nil, nil, nil ], membership_details(assignment_link)
+    assert_equal [ false, true, "2", "University", "https://ror.org/example" ], membership_details(team_membership)
+  end
+
+  test "an assignment keeps its membership details while another membership still identifies it" do
+    input = @rows["team_memberships"].sole
+    input["user_role"] = "owner"
+    other = input.merge("id" => 28)
+    @rows["team_memberships"] << other
+    sync
+    shared_link = team_membership
+
+    @rows["team_memberships"] = [ input.merge("user_role" => "postdoc") ]
+    sync
+
+    assert_equal [ false, true, "2", "University", "https://ror.org/example" ], membership_details(shared_link.reload)
   end
 
   test "conflicting incoming memberships roll back without changing the existing role" do
@@ -88,5 +105,11 @@ class Rams::ProjectMembershipTest < ActiveSupport::TestCase
     assert_equal "2", membership.affiliation_source_id
     assert_equal result.fetch(:import_run_id), membership.source_identifiers.sole.import_run_id
     assert_equal result.fetch(:import_run_id), ImportRun.sole.id
+  end
+
+  private
+
+  def membership_details(link)
+    [ link.active, link.is_principal_investigator, link.affiliation_source_id, link.affiliation_name, link.affiliation_ror_id ]
   end
 end

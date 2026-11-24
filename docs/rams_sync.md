@@ -27,7 +27,9 @@ membership stays with its person. Visits and funding remain unmodeled.
 
 After migrating, rerun the same sync to backfill these roles on existing projects.
 Reruns refresh mapped fields and reassign roles when RAMS reports a different user.
-Removals remain outside this slice.
+Removals remain outside this slice. Rolling back the role uniqueness migration
+requires that each project and person have at most one link. The rollback stops
+before changing the indexes if multiple role links exist.
 The imported-record summary counts distinct records processed by the current
 batch, including existing records on reruns, rather than installation-wide
 totals or only newly created records.
