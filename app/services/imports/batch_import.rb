@@ -15,7 +15,7 @@ module Imports
       @batch.stations.each { |row| import_station(row) }
       @batch.people.each { |row| import_person(row) }
       @batch.activities.each { |row| import_activity(row) }
-      import_memberships
+      ActivityPeopleImport.new(batch: @batch, records: @records).call
       # Read persisted values back in batches for validation.
       SourceIdentityMap.new(source: @batch.source)
     end
@@ -51,34 +51,6 @@ module Imports
       activity.update!(attributes)
       stations.each { |station| activity.stations << station unless activity.stations.include?(station) }
       activity
-    end
-
-    def import_memberships
-      activities = @batch.activities.map { |row| @records.fetch(ResearchActivity, row.external_id).id }
-      memberships = ActivityPerson.where(research_activity_id: activities).index_by { |membership| [ membership.research_activity_id, membership.person_id ] }
-      incoming = @batch.memberships.group_by { |row| membership_key(row) }
-      incoming.each { |key, rows| import_membership(rows, memberships[key]) }
-    end
-
-    def membership_key(row)
-      [ @records.fetch(ResearchActivity, row.activity_id).id,
-        @records.fetch(Person, row.person_id).id ]
-    end
-
-    def import_membership(rows, existing)
-      attributes = rows.map(&:attributes).uniq
-      raise Error, "Conflicting incoming memberships for activity #{rows.first.activity_id}" unless attributes.one?
-      activity_id, person_id = membership_key(rows.first)
-      rows.each { |row| verify_membership_identity!(row, activity_id, person_id) }
-      membership = persist(ActivityPerson, existing, attributes.sole.merge(research_activity_id: activity_id, person_id: person_id))
-      rows.each { |row| @records.identify(membership, row.external_id) }
-    end
-
-    def verify_membership_identity!(row, activity_id, person_id)
-      existing = @records.find(ActivityPerson, row.external_id)
-      if existing && [ existing.research_activity_id, existing.person_id ] != [ activity_id, person_id ]
-        raise Error, "Membership identity conflict for #{row.external_id}"
-      end
     end
 
     def persist(type, existing, attributes)

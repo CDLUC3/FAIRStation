@@ -17,9 +17,17 @@ stations, people, activities and memberships atomically. Each membership retains
 the institution ID and name asserted by RAMS, plus its ROR ID when available in
 the retrieved institution directory. The affiliation describes that project
 membership. A membership without an institution imports with empty affiliation
-fields. Visits, funding and owner/applicant relationships remain unmodeled.
-Reruns refresh mapped fields without duplicating source identities. Removals
-remain outside this slice.
+fields. Project owners and applicants import as separate `ActivityPerson` rows
+with the RAMS roles `owner` and `applicant`, even without a team membership.
+Both roles can point to the same person. The sync resolves each person by their
+typed RAMS user ID and uses the project ID and role to track the relationship.
+A project assignment and team membership share a link when their project,
+person, and role match. If RAMS reassigns the project role, the original team
+membership stays with its person. Visits and funding remain unmodeled.
+
+After migrating, rerun the same sync to backfill these roles on existing projects.
+Reruns refresh mapped fields and reassign roles when RAMS reports a different user.
+Removals remain outside this slice.
 The imported-record summary counts distinct records processed by the current
 batch, including existing records on reruns, rather than installation-wide
 totals or only newly created records.

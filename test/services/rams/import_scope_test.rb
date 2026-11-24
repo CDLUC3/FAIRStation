@@ -24,7 +24,7 @@ class Rams::ImportScopeTest < ActiveSupport::TestCase
     sync
     assert_equal 1, Station.count
     assert_equal 1, Person.count
-    assert_equal 1, ActivityPerson.count
+    assert_equal 9, ActivityPerson.count
     assert_equal "Quail Ridge Reserve", @station.reload.name
   end
 
@@ -77,7 +77,7 @@ class Rams::ImportScopeTest < ActiveSupport::TestCase
     assert_equal 2, Station.count
     assert_equal 16, ActivityStation.count
     assert_equal 1, Person.count
-    assert_equal 1, ActivityPerson.count
+    assert_equal 9, ActivityPerson.count
   end
 
   test "a station with no visits completes an empty sync" do

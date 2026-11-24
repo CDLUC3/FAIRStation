@@ -23,4 +23,8 @@ module RamsImport
   def sync(archive: Imports::SourceArchive.new(directory: @evidence_directory))
     Imports::Sync.new(adapter: @adapter, client: @client, archive: archive).call
   end
+
+  def team_membership
+    SourceIdentifier.find_by!(**@connection.source, record_type: "ActivityPerson", external_id: "27").record
+  end
 end

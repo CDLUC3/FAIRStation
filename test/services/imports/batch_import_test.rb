@@ -30,6 +30,19 @@ class Imports::BatchImportTest < ActiveSupport::TestCase
     assert_equal 2, ResearchActivity.sole.stations.count
   end
 
+  test "membership role names are interpreted by the source" do
+    original = batch
+    row = original.memberships.sole
+    owner = row.with(attributes: row.attributes.merge(role: "owner"))
+    import(original.with(memberships: [ owner ]))
+    membership = ActivityPerson.sole
+
+    import(original)
+
+    assert_equal membership, ActivityPerson.sole
+    assert_equal "researcher", membership.reload.role
+  end
+
   test "identical external IDs from another installation remain distinct" do
     import(batch)
     import(batch(instance: "installation-b"))

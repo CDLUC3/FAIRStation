@@ -21,9 +21,18 @@ module Imports
       record
     end
 
+    # A shared membership and assignment can diverge while retaining their source IDs.
+    def move_activity_person_identities(from:, to:, external_ids:)
+      identifiers = external_ids.map { |id| @identifiers.fetch(key(ActivityPerson.name, id)) }
+      if identifiers.any? { |identifier| identifier.record != from }
+        raise Error, "Source identity conflict"
+      end
+      identifiers.each { |identifier| identifier.update!(record: to) }
+    end
+
     def counts(batch:)
       { Station => batch.stations, ResearchActivity => batch.activities,
-        Person => batch.people, ActivityPerson => batch.memberships }.to_h do |type, rows|
+        Person => batch.people, ActivityPerson => batch.memberships + batch.assignments }.to_h do |type, rows|
         records = rows.map { |row| fetch(type, row.external_id).id }
         [ type.name, records.uniq.size ]
       end
