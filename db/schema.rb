@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_11_23_184522) do
+ActiveRecord::Schema[8.1].define(version: 2026_11_24_190100) do
   create_table "activity_people", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
     t.bigint "research_activity_id", null: false
     t.bigint "person_id", null: false
@@ -37,6 +37,20 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_23_184522) do
     t.index ["station_id"], name: "index_activity_stations_on_station_id"
   end
 
+  create_table "candidate_matches", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
+    t.bigint "research_activity_id", null: false
+    t.bigint "output_id", null: false
+    t.float "score", null: false
+    t.json "evidence"
+    t.string "review_status", default: "pending", null: false
+    t.text "review_note"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["output_id"], name: "index_candidate_matches_on_output_id"
+    t.index ["research_activity_id", "output_id"], name: "index_candidate_matches_on_research_activity_id_and_output_id", unique: true
+    t.check_constraint "`review_status` in (_utf8mb4'pending',_utf8mb4'confirmed',_utf8mb4'rejected')", name: "candidate_matches_review_status"
+  end
+
   create_table "import_runs", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
     t.string "source_system", limit: 128, null: false
     t.string "source_instance", limit: 128, null: false
@@ -50,6 +64,18 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_23_184522) do
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.index ["source_system", "source_instance", "station_external_id", "successful_at"], name: "index_import_runs_on_source_station_success"
+  end
+
+  create_table "outputs", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
+    t.string "kind", null: false
+    t.text "title"
+    t.string "doi"
+    t.text "url"
+    t.date "published_on"
+    t.datetime "retrieved_at"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.check_constraint "`kind` in (_utf8mb4'paper',_utf8mb4'dataset')", name: "outputs_kind"
   end
 
   create_table "people", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
@@ -110,5 +136,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_23_184522) do
   add_foreign_key "activity_people", "research_activities"
   add_foreign_key "activity_stations", "research_activities"
   add_foreign_key "activity_stations", "stations"
+  add_foreign_key "candidate_matches", "outputs"
+  add_foreign_key "candidate_matches", "research_activities"
   add_foreign_key "source_identifiers", "import_runs"
 end
