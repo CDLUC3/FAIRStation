@@ -7,7 +7,7 @@ class CandidateMatchTest < ActiveSupport::TestCase
   end
 
   test "rescoring preserves review decisions and structured evidence" do
-    match = @activity.candidate_matches.create!(output: @output, score: 2)
+    match = @activity.candidate_matches.create!(output: @output, score: 2, evidence: [ "Matching title" ])
     assert_equal "pending", match.review_status
     match.update!(review_status: "rejected", review_note: "Different site")
 
@@ -22,10 +22,23 @@ class CandidateMatchTest < ActiveSupport::TestCase
   end
 
   test "database prevents duplicate candidates for an activity" do
-    match = @activity.candidate_matches.create!(output: @output, score: 1)
+    match = @activity.candidate_matches.create!(output: @output, score: 1, evidence: [ "Matching title" ])
     assert_not match.dup.valid?
     assert_raises ActiveRecord::RecordNotUnique do
-      CandidateMatch.insert_all!([ { output_id: @output.id, research_activity_id: @activity.id, score: 2 } ])
+      CandidateMatch.insert_all!([ { output_id: @output.id, research_activity_id: @activity.id, score: 2, evidence: [ "Matching title" ] } ])
+    end
+  end
+
+  test "both model saves and bulk writes require nonempty structured evidence" do
+    attributes = { research_activity_id: @activity.id, output_id: @output.id, score: 1 }
+
+    [ nil, {}, [], "oak", 1, false ].each do |evidence|
+      match = CandidateMatch.new(**attributes, evidence: evidence)
+      assert_not match.save, "Model accepted #{evidence.inspect}"
+      assert match.errors[:evidence].any?
+      assert_raises ActiveRecord::StatementInvalid do
+        CandidateMatch.insert_all!([ attributes.merge(evidence: evidence) ])
+      end
     end
   end
 

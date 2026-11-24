@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_11_24_190100) do
+ActiveRecord::Schema[8.1].define(version: 2026_11_24_195150) do
   create_table "activity_people", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
     t.bigint "research_activity_id", null: false
     t.bigint "person_id", null: false
@@ -48,6 +48,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_24_190100) do
     t.datetime "updated_at", null: false
     t.index ["output_id"], name: "index_candidate_matches_on_output_id"
     t.index ["research_activity_id", "output_id"], name: "index_candidate_matches_on_research_activity_id_and_output_id", unique: true
+    t.check_constraint "(`evidence` is not null) and (json_type(`evidence`) in (_utf8mb4'OBJECT',_utf8mb4'ARRAY')) and (json_length(`evidence`) > 0)", name: "candidate_matches_evidence"
     t.check_constraint "`review_status` in (_utf8mb4'pending',_utf8mb4'confirmed',_utf8mb4'rejected')", name: "candidate_matches_review_status"
   end
 
