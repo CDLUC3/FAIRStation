@@ -38,16 +38,21 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_24_195150) do
   end
 
   create_table "candidate_matches", charset: "utf8mb4", collation: "utf8mb4_0900_ai_ci", force: :cascade do |t|
-    t.bigint "research_activity_id", null: false
+    t.bigint "station_id", null: false
+    t.bigint "research_activity_id"
     t.bigint "output_id", null: false
     t.float "score", null: false
     t.json "evidence"
     t.string "review_status", default: "pending", null: false
     t.text "review_note"
+    t.float "reviewed_score"
+    t.json "reviewed_evidence"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.index ["output_id"], name: "index_candidate_matches_on_output_id"
-    t.index ["research_activity_id", "output_id"], name: "index_candidate_matches_on_research_activity_id_and_output_id", unique: true
+    t.index ["research_activity_id"], name: "index_candidate_matches_on_research_activity_id"
+    t.index ["station_id", "output_id"], name: "index_candidate_matches_on_station_id_and_output_id", unique: true
+    t.check_constraint "((`review_status` = _utf8mb4'pending') and (`reviewed_score` is null) and (`reviewed_evidence` is null)) or ((`review_status` in (_utf8mb4'confirmed',_utf8mb4'rejected')) and (`reviewed_score` is not null) and (`reviewed_evidence` is not null) and (json_type(`reviewed_evidence`) in (_utf8mb4'OBJECT',_utf8mb4'ARRAY')) and (json_length(`reviewed_evidence`) > 0))", name: "candidate_matches_review_snapshot"
     t.check_constraint "(`evidence` is not null) and (json_type(`evidence`) in (_utf8mb4'OBJECT',_utf8mb4'ARRAY')) and (json_length(`evidence`) > 0)", name: "candidate_matches_evidence"
     t.check_constraint "`review_status` in (_utf8mb4'pending',_utf8mb4'confirmed',_utf8mb4'rejected')", name: "candidate_matches_review_status"
   end
@@ -76,6 +81,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_24_195150) do
     t.datetime "retrieved_at"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.index ["doi"], name: "index_outputs_on_doi", unique: true
     t.check_constraint "`kind` in (_utf8mb4'paper',_utf8mb4'dataset')", name: "outputs_kind"
   end
 
@@ -138,6 +144,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_24_195150) do
   add_foreign_key "activity_stations", "research_activities"
   add_foreign_key "activity_stations", "stations"
   add_foreign_key "candidate_matches", "outputs"
-  add_foreign_key "candidate_matches", "research_activities"
+  add_foreign_key "candidate_matches", "research_activities", on_delete: :nullify
+  add_foreign_key "candidate_matches", "stations"
   add_foreign_key "source_identifiers", "import_runs"
 end

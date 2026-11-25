@@ -3,8 +3,8 @@ class ResearchActivity < ApplicationRecord
   has_many :stations, through: :activity_stations
   has_many :activity_people, dependent: :destroy, inverse_of: :research_activity
   has_many :people, -> { distinct }, through: :activity_people
-  has_many :candidate_matches, dependent: :destroy
-  has_many :outputs, through: :candidate_matches
+  has_many :candidate_matches
+  has_many :outputs, -> { distinct }, through: :candidate_matches
   has_many :source_identifiers, as: :record, dependent: :destroy, inverse_of: :record
 
   validates :stations, presence: true
